@@ -135,25 +135,6 @@ export default function SupportTicket() {
           </div>
         ))}
       </div>
-
-      {/* Image Modal */}
-      {modalImage && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-          <div className="relative">
-            <button
-              onClick={() => setModalImage(null)}
-              className="absolute top-2 right-2 text-white bg-red-600 rounded-full w-8 h-8 flex items-center justify-center text-lg font-bold hover:bg-red-700"
-            >
-              &times;
-            </button>
-            <img
-              src={modalImage}
-              alt="Issue"
-              className="max-w-[90vw] max-h-[90vh] rounded shadow-lg object-contain"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
