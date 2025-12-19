@@ -428,6 +428,7 @@ export default function Delegation() {
                       Deadline: {task.Deadline || "—"} <br />
                       Completed: {task.FinalDate || "—"} <br />
                       Priority: {task.Priority || "Normal"}
+                      Name:{task.Name||"_"}
                     </div>
                   </div>
                   <span className={`px-2 py-1 rounded text-sm ${

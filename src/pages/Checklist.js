@@ -211,6 +211,8 @@ export default function Checklist() {
                       Frequency: {c.Freq === "D" ? "Daily" : c.Freq === "W" ? "Weekly" : "Monthly"}
                     </div>
                     <div className="text-gray-500 text-sm mt-1">Planned: {c.Planned}</div>
+                    <div className="text-gray-500 text-sm mt-1">Name: {c.Name}</div>
+
                   </div>
 
                   {!c.Actual && (
