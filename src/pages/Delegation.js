@@ -212,8 +212,14 @@ export default function Delegation() {
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
       setTasks(
-        tasks.map((t) =>
-          t.TaskID === taskID ? { ...t, Taskcompletedapproval: value } : t
+        tasks.map((t) =>{
+          if(value="Pending") {
+         return t.TaskID === taskID ? { ...t,FinalDate:"",Status:"Pending", Taskcompletedapproval: value } : t
+
+          }else{
+         return t.TaskID === taskID ? { ...t, Taskcompletedapproval: value } : t
+          }
+        }
         )
       );
     } catch (err) {
@@ -314,6 +320,7 @@ export default function Delegation() {
           onChange={(e) => setSelectedEmp(e.target.value)}
         >
           <option value="">-- Select Employee --</option>
+            <option key={"all"} value={"all"}>{"All Delegation"}</option>
           {employees.map((emp) => (
             <option key={emp.name} value={emp.name}>{emp.name}</option>
           ))}

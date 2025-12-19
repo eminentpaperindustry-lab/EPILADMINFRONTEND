@@ -158,6 +158,8 @@ export default function Checklist() {
           onChange={(e) => setSelectedEmp(e.target.value)}
         >
           <option value="">-- Select Employee --</option>
+            <option key={"all"} value={"all"}>{"All Checklist"}</option>
+
           {employees.map((emp) => (
             <option key={emp.name} value={emp.name}>{emp.name}</option>
           ))}
