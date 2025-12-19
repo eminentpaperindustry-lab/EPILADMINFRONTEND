@@ -427,7 +427,7 @@ export default function Delegation() {
                       Created: {task.CreatedDate || "—"} <br />
                       Deadline: {task.Deadline || "—"} <br />
                       Completed: {task.FinalDate || "—"} <br />
-                      Priority: {task.Priority || "Normal"}
+                      Priority: {task.Priority || "Normal"}<br />
                       Name:{task.Name||"_"}
                     </div>
                   </div>
