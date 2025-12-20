@@ -93,8 +93,8 @@ export default function Sidebar({ mobile }) {
               ✕
             </button>
             <div className="text-right">
-              <div className="text-lg font-semibold leading-none">Employee Portal</div>
-              <div className="text-[11px] text-gray-400 mt-1 leading-none">Task Management</div>
+              <div className="text-lg font-semibold leading-none">Admin Portal</div>
+              <div className="text-[11px] text-gray-400 mt-1 leading-none">Tracked Performance Overview:</div>
             </div>
           </div>
 
