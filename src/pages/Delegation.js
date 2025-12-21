@@ -37,7 +37,7 @@ export default function Delegation() {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     const dd = String(d.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
+    return `${dd}-${mm}-${yyyy}`;
   };
 
   // -----------------------
@@ -63,11 +63,11 @@ export default function Delegation() {
 
       const formattedTasks = res.data.map((t) => ({
         ...t,
-        CreatedDate: normalizeDate(t.CreatedDate),
+        CreatedDate: t.CreatedDate,
         Deadline: normalizeDate(t.Deadline),
         Revision1: normalizeDate(t.Revision1),
         Revision2: normalizeDate(t.Revision2),
-        FinalDate: normalizeDate(t.FinalDate),
+        FinalDate: t.FinalDate,
       }));
 
       setTasks(formattedTasks);
@@ -213,7 +213,7 @@ export default function Delegation() {
       );
       setTasks(
         tasks.map((t) =>{
-          if(value="Pending") {
+          if(value=="Pending") {
          return t.TaskID === taskID ? { ...t,FinalDate:"",Status:"Pending", Taskcompletedapproval: value } : t
 
           }else{
@@ -306,6 +306,9 @@ export default function Delegation() {
     }
     return false;
   });
+
+console.log("filteredTasks:",tasks);
+
 
   // -----------------------
   return (

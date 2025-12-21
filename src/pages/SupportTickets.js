@@ -3,7 +3,10 @@ import axios from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import customParseFormat from "dayjs/plugin/customParseFormat";  // Add this import
+
 dayjs.extend(relativeTime);
+dayjs.extend(customParseFormat);  // Add this extension
 
 export default function SupportTicket() {
   const { user } = useContext(AuthContext);
@@ -52,22 +55,6 @@ export default function SupportTicket() {
 
       {/* Filters */}
       <div className="bg-white p-4 rounded shadow mb-6 flex gap-4 flex-wrap">
-        {/* <input
-          type="text"
-          name="assignedTo"
-          value={filters.assignedTo}
-          onChange={handleFilterChange}
-          placeholder="Filter by Assigned To"
-          className="border p-2 rounded flex-1 min-w-[150px]"
-        />
-        <input
-          type="text"
-          name="createdBy"
-          value={filters.createdBy}
-          onChange={handleFilterChange}
-          placeholder="Filter by Created By"
-          className="border p-2 rounded flex-1 min-w-[150px]"
-        /> */}
         <select
           name="status"
           value={filters.status}
@@ -92,50 +79,57 @@ export default function SupportTicket() {
         {tickets.length === 0 && (
           <div className="text-gray-500 text-center">No tickets available</div>
         )}
-        {tickets.map((t) => (
-          <div
-            key={t.TicketID}
-            className="bg-white p-4 rounded shadow flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-          >
-            <div className="flex-1">
-              <div className="font-semibold text-lg">{t.Issue}</div>
-              <div className="text-sm text-gray-600 mt-1">
-                Created By: <span className="font-medium">{t.CreatedBy}</span>
-              </div>
-              <div className="text-sm text-gray-600">
-                Assigned To: <span className="font-medium">{t.AssignedTo}</span>
-              </div>
-              <div className="text-sm text-gray-600">
-                Created Date: {dayjs(t.CreatedDate).format("DD MMM YYYY, HH:mm")}
-              </div>
-              <div className="text-sm text-gray-600">
-                Elapsed: {dayjs(t.CreatedDate).fromNow()}
-              </div>
-            </div>
+        {tickets.map((t) => {
+          // Parse the backend date format using dayjs and customParseFormat
+          const createdDate = dayjs(t.CreatedDate, "DD/MM/YYYY HH:mm:ss");
 
-            <div className="flex gap-2 mt-2 md:mt-0">
-              {t.IssuePhoto && (
-                <button
-                  onClick={() => setModalImage(t.IssuePhoto)}
-                  className="bg-gray-700 text-white px-3 py-1 rounded hover:bg-gray-800"
-                >
-                  View Image
-                </button>
-              )}
-              <span className={`px-3 py-1 rounded ${
-                t.Status === "Pending"
-                  ? "bg-yellow-400 text-black"
-                  : t.Status === "InProgress"
-                  ? "bg-blue-600 text-white"
-                  : "bg-green-600 text-white"
-              }`}>
-                {t.Status}
-              </span>
+          return (
+            <div
+              key={t.TicketID}
+              className="bg-white p-4 rounded shadow flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+            >
+              <div className="flex-1">
+                <div className="font-semibold text-lg">{t.Issue}</div>
+                <div className="text-sm text-gray-600 mt-1">
+                  Created By: <span className="font-medium">{t.CreatedBy}</span>
+                </div>
+                <div className="text-sm text-gray-600">
+                  Assigned To: <span className="font-medium">{t.AssignedTo}</span>
+                </div>
+                <div className="text-sm text-gray-600">
+                  Created Date: {createdDate.format("DD MMM YYYY, HH:mm")}
+                </div>
+                <div className="text-sm text-gray-600">
+                  Elapsed: {createdDate.fromNow()}
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-2 md:mt-0">
+                {t.IssuePhoto && (
+                  <button
+                    onClick={() => setModalImage(t.IssuePhoto)}
+                    className="bg-gray-700 text-white px-3 py-1 rounded hover:bg-gray-800"
+                  >
+                    View Image
+                  </button>
+                )}
+                <span className={`px-3 py-1 rounded ${
+                  t.Status === "Pending"
+                    ? "bg-yellow-400 text-black"
+                    : t.Status === "InProgress"
+                    ? "bg-blue-600 text-white"
+                    : "bg-green-600 text-white"
+                }`}>
+                  {t.Status}
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
-         {modalImage && (
+
+      {/* Modal for Viewing Image */}
+      {modalImage && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
           <div className="relative">
             <button

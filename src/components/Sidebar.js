@@ -94,7 +94,7 @@ export default function Sidebar({ mobile }) {
             </button>
             <div className="text-right">
               <div className="text-lg font-semibold leading-none">Admin Portal</div>
-              <div className="text-[11px] text-gray-400 mt-1 leading-none">Tracked Performance Overview:</div>
+              <div className="text-[11px] text-gray-400 mt-1 leading-none">Tracked Performance Overview</div>
             </div>
           </div>
 
@@ -115,8 +115,8 @@ export default function Sidebar({ mobile }) {
   return (
     <aside className="h-screen w-64 bg-gray-900 text-white flex flex-col">
       <div className="px-6 py-5 border-b border-gray-800">
-        <div className="text-2xl font-bold">Employee Portal</div>
-        <div className="text-xs text-gray-400">Task Management</div>
+        <div className="text-2xl font-bold">Admin Portal</div>
+        <div className="text-xs text-gray-400">Tracked Performance Overview</div>
       </div>
 
       <nav className="p-6 space-y-2">
