@@ -43,6 +43,13 @@ export default function Checklist() {
     }
   };
 
+    const normalizeDate = (d) => {
+    if (!d) return null;
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  };
+
   // ---------------- LOAD CHECKLISTS FOR SELECTED EMPLOYEE ----------------
   const loadChecklists = async (employeeName) => {
     if (!employeeName) return;
@@ -96,41 +103,102 @@ export default function Checklist() {
   };
 
   // ---------------- FILTER LOGIC ----------------
-  const filteredChecklists = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const { start: weekStart, end: weekEnd } = getWeekRange(today);
+  // const filteredChecklists = () => {
+  //   const today = new Date();
+  //   today.setHours(0, 0, 0, 0);
+  //   const { start: weekStart, end: weekEnd } = getWeekRange(today);
 
-    return checklists.filter((c) => {
-      const planned = parseDate(c.Planned);
-      const actual = parseDate(c.Actual);
-      if (!planned) return false;
+  //   return checklists.filter((c) => {
+  //     const planned = parseDate(c.Planned);
+  //     const actual = parseDate(c.Actual);
+  //     if (!planned) return false;
 
-      planned.setHours(0, 0, 0, 0);
-      const isDone = !!actual;
-      const freq = c.Freq;
+  //     planned.setHours(0, 0, 0, 0);
+  //     const isDone = !!actual;
+  //     const freq = c.Freq;
 
-      if (activeTab === "pending") {
-        if (isDone) return false;
-        if (freq === "D" && planned < today) return true;
-        if (freq === "W" && planned < weekStart) return true;
-        if (
-          freq === "M" &&
-          (planned.getFullYear() < today.getFullYear() ||
-            (planned.getFullYear() === today.getFullYear() &&
-              planned.getMonth() < today.getMonth()))
-        )
-          return true;
-        return false;
+  //     if (activeTab === "pending") {
+  //       if (isDone) return false;
+  //       if (freq === "D" && planned < today) return true;
+  //       if (freq === "W" && planned < weekStart) return true;
+  //       if (
+  //         freq === "M" &&
+  //         (planned.getFullYear() < today.getFullYear() ||
+  //           (planned.getFullYear() === today.getFullYear() &&
+  //             planned.getMonth() < today.getMonth()))
+  //       )
+  //         return true;
+  //       return false;
+  //     }
+
+  //     if (activeTab === "Daily") return freq === "D" && planned.getTime() === today.getTime() && !isDone;
+  //     if (activeTab === "Weekly") return freq === "W" && !isDone && planned >= weekStart && planned <= weekEnd;
+  //     if (activeTab === "Monthly") return freq === "M" && !isDone && planned.getMonth() === today.getMonth() && planned.getFullYear() === today.getFullYear();
+
+  //     return false;
+  //   });
+  // };
+
+
+    // ---------------- FILTER LOGIC ----------------
+ const filteredChecklists = () => {
+  if (!checklists || !Array.isArray(checklists)) return [];
+
+  const today = normalizeDate(new Date());
+  const { start: weekStart, end: weekEnd } = getWeekRange(today);
+
+  return checklists.filter((c) => {
+    if (!c) return false;
+
+    const planned = parseDate(c.Planned);
+    if (!planned) return false;
+
+    const plannedDate = normalizeDate(planned);
+    const isDone = !!parseDate(c.Actual);
+    const freq = c.Freq;
+
+    // -------- PENDING --------
+    if (activeTab === "pending") {
+      // Pending = tasks that were supposed to be done in past and still not done
+      if (isDone) return false;
+
+      if (freq === "D" && plannedDate < today) return true;
+      if (freq === "W") {
+        const { start: taskWeekStart, end: taskWeekEnd } = getWeekRange(plannedDate);
+        return taskWeekEnd < today; // task ka week already past
       }
-
-      if (activeTab === "Daily") return freq === "D" && planned.getTime() === today.getTime() && !isDone;
-      if (activeTab === "Weekly") return freq === "W" && !isDone && planned >= weekStart && planned <= weekEnd;
-      if (activeTab === "Monthly") return freq === "M" && !isDone && planned.getMonth() === today.getMonth() && planned.getFullYear() === today.getFullYear();
-
+      if (freq === "M") {
+        return (
+          plannedDate.getFullYear() < today.getFullYear() ||
+          (plannedDate.getFullYear() === today.getFullYear() && plannedDate.getMonth() < today.getMonth())
+        );
+      }
       return false;
-    });
-  };
+    }
+
+    // -------- DAILY --------
+    if (activeTab === "Daily") {
+      return freq === "D" && !isDone && plannedDate.getTime() === today.getTime();
+    }
+
+    // -------- WEEKLY --------
+    if (activeTab === "Weekly") {
+      return freq === "W" && !isDone && plannedDate >= weekStart && plannedDate <= weekEnd;
+    }
+
+    // -------- MONTHLY --------
+    if (activeTab === "Monthly") {
+      return (
+        freq === "M" &&
+        !isDone &&
+        plannedDate.getMonth() === today.getMonth() &&
+        plannedDate.getFullYear() === today.getFullYear()
+      );
+    }
+
+    return false;
+  });
+};
 
   useEffect(() => {
     if (user) loadEmployees(); // Load employees only once when the component mounts
