@@ -368,7 +368,7 @@ const filteredTasks = sortedTasks.filter((t) => {
   } else if (activeTab === "approved") {
     return t.Status === "Completed" && t.Taskcompletedapproval === "Approved";
   } else if (activeTab === "Today_Followup") {
-    return t.Deadline <= formatDateDDMMYYYYHHMMSS();
+    return t.Deadline <= formatDateDDMMYYYYHHMMSS() && t.Status !== "Completed";
   }
   return false;
 });
