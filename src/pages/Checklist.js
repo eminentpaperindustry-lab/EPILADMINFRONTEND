@@ -147,7 +147,18 @@ export default function Checklist() {
   const today = normalizeDate(new Date());
   const { start: weekStart, end: weekEnd } = getWeekRange(today);
 
-  return checklists.filter((c) => {
+const sortedchecklists = checklists.sort((a, b) => {
+  // Ensure no undefined or null values for employee names, and handle them gracefully
+  const nameA = (a.Name || "").toLowerCase();  // Fallback to empty string if undefined or null
+  const nameB = (b.Name || "").toLowerCase();  // Fallback to empty string if undefined or null
+
+  return nameA.localeCompare(nameB); // Case-insensitive alphabetical sorting
+});
+
+console.log("sortedchecklists:",sortedchecklists);
+
+
+  return sortedchecklists.filter((c) => {
     if (!c) return false;
 
     const planned = parseDate(c.Planned);
@@ -228,9 +239,13 @@ export default function Checklist() {
           <option value="">-- Select Employee --</option>
             <option key={"all"} value={"all"}>{"All Checklist"}</option>
 
-          {employees.map((emp) => (
-            <option key={emp.name} value={emp.name}>{emp.name}</option>
-          ))}
+         {employees
+  .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())) // Sorting employees by name in alphabetical order
+  .map((emp) => (
+    <option key={emp.name} value={emp.name}>
+      {emp.name}
+    </option>
+  ))}
         </select>
       </div>
 
@@ -276,10 +291,10 @@ export default function Checklist() {
                   <div className="mb-2 sm:mb-0 sm:max-w-[70%]">
                     <div className="font-semibold text-gray-800 text-base sm:text-lg">{c.Task}</div>
                     <div className="text-gray-600 text-sm mt-1">
-                      Frequency: {c.Freq === "D" ? "Daily" : c.Freq === "W" ? "Weekly" : "Monthly"}
+                      Frequency: {c.Freq === "D" ? "Daily" : c.Freq === "W" ? "Weekly" : "Monthly"} <span>Planned: {c.Planned}</span> <span>Name: {c.Name}</span>
                     </div>
-                    <div className="text-gray-500 text-sm mt-1">Planned: {c.Planned}</div>
-                    <div className="text-gray-500 text-sm mt-1">Name: {c.Name}</div>
+                    {/* <div className="text-gray-500 text-sm mt-1">Planned: {c.Planned}</div>
+                    <div className="text-gray-500 text-sm mt-1">Name: {c.Name}</div> */}
 
                   </div>
 

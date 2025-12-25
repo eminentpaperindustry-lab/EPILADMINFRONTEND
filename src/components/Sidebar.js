@@ -38,6 +38,7 @@ export default function Sidebar({ mobile }) {
   // Function to fetch tickets and update the counts
   const loadTickets = async () => {
     try {
+      setLoading(true);  // Start loading state
       const token = localStorage.getItem("token");
       if (!token) return;
 
@@ -57,17 +58,18 @@ export default function Sidebar({ mobile }) {
       setHelpTicketCount(activeHelp.length);
     } catch (err) {
       console.error("Failed to load tickets:", err.response ? err.response.data : err);
+    } finally {
+      setLoading(false); // Stop loading state after API call
     }
-    setLoading(false);
   };
 
-  // Call loadTickets on mount and every 1 hour
+  // Call loadTickets on mount and every 15 minutes
   useEffect(() => {
     loadTickets(); // initial load
 
     const interval = setInterval(() => {
       loadTickets();
-    }, 900000); // 1 hour in ms
+    }, 900000); // 15 minutes in ms
 
     return () => clearInterval(interval); // cleanup on unmount
   }, []);
@@ -101,8 +103,12 @@ export default function Sidebar({ mobile }) {
           <nav className="p-6 space-y-2">
             <MenuItem to="/delegation" icon={FaTasks} onClick={closeSidebar}>Delegation</MenuItem>
             <MenuItem to="/checklist" icon={FaClipboardList} onClick={closeSidebar}>Checklist</MenuItem>
-            <MenuItem to="/support-ticket" icon={FaHeadset} onClick={closeSidebar} count={supportTicketCount}>Support Ticket</MenuItem>
-            <MenuItem to="/help-ticket" icon={FaLifeRing} onClick={closeSidebar} count={helpTicketCount}>Help Ticket</MenuItem>
+            <MenuItem to="/support-ticket" icon={FaHeadset} onClick={closeSidebar} count={supportTicketCount}>
+              Support Ticket
+            </MenuItem>
+            <MenuItem to="/help-ticket" icon={FaLifeRing} onClick={closeSidebar} count={helpTicketCount}>
+              Help Ticket
+            </MenuItem>
           </nav>
         </aside>
 
@@ -122,8 +128,12 @@ export default function Sidebar({ mobile }) {
       <nav className="p-6 space-y-2">
         <MenuItem to="/delegation" icon={FaTasks} count={0}>Delegation</MenuItem>
         <MenuItem to="/checklist" icon={FaClipboardList} count={0}>Checklist</MenuItem>
-        <MenuItem to="/support-ticket" icon={FaHeadset} count={supportTicketCount}>Support Ticket</MenuItem>
-        <MenuItem to="/help-ticket" icon={FaLifeRing} count={helpTicketCount}>Help Ticket</MenuItem>
+        <MenuItem to="/support-ticket" icon={FaHeadset} count={supportTicketCount}>
+          Support Ticket
+        </MenuItem>
+        <MenuItem to="/help-ticket" icon={FaLifeRing} count={helpTicketCount}>
+          Help Ticket
+        </MenuItem>
       </nav>
     </aside>
   );

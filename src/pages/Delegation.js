@@ -30,15 +30,59 @@ export default function Delegation() {
   });
 
   // -----------------------
-  const normalizeDate = (date) => {
-    if (!date) return "";
-    const d = new Date(date);
-    if (isNaN(d)) return "";
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${dd}-${mm}-${yyyy}`;
-  };
+  // const normalizeDate = (date) => {
+  //   if (!date) return "";
+  //   const d = new Date(date);
+  //   if (isNaN(d)) return "";
+  //   const yyyy = d.getFullYear();
+  //   const mm = String(d.getMonth() + 1).padStart(2, "0");
+  //   const dd = String(d.getDate()).padStart(2, "0");
+  //   return `${dd}-${mm}-${yyyy}`;
+  // };
+
+
+  function formatDateDDMMYYYYHHMMSS(date = new Date()) {
+  // Convert to IST (UTC + 5:30)
+  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istDate = new Date(utc + istOffset);
+
+  const dd = String(istDate.getDate()).padStart(2, "0");
+  const mm = String(istDate.getMonth() + 1).padStart(2, "0");
+  const yyyy = istDate.getFullYear();
+  const hh = String(istDate.getHours()).padStart(2, "0");
+  const min = String(istDate.getMinutes()).padStart(2, "0");
+  const ss = String(istDate.getSeconds()).padStart(2, "0");
+
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}:${ss}`;
+}
+  
+const normalizeDate = (date) => {
+  if (!date) return "";
+
+  // Convert to Date object (current date if date is empty)
+  const d = new Date(date || Date.now()); // If no date is passed, use current date/time.
+  if (isNaN(d)) return ""; // Invalid date
+
+  // Adjust time to IST (UTC +5:30)
+  const IST_OFFSET = 5.5 * 60; // IST is UTC+5:30, so offset in minutes is 330 minutes
+  
+  // Get the UTC time and convert it to IST
+  const utcMinutes = d.getMinutes() + d.getHours() * 60 + d.getUTCMinutes() - d.getMinutes();
+  const adjustedMinutes = utcMinutes + IST_OFFSET; // Apply IST offset
+  const adjustedDate = new Date(d.setMinutes(adjustedMinutes));
+
+  const yyyy = adjustedDate.getFullYear();
+  const mm = String(adjustedDate.getMonth() + 1).padStart(2, "0");
+  const dd = String(adjustedDate.getDate()).padStart(2, "0");
+  const hours = String(adjustedDate.getHours()).padStart(2, "0");
+  const minutes = String(adjustedDate.getMinutes()).padStart(2, "0");
+  const seconds = String(adjustedDate.getSeconds()).padStart(2, "0");
+
+  // return `${dd}/${mm}/${yyyy} ${hours}:${minutes}:${seconds}`;
+
+  return `${dd}/${mm}/${yyyy}`
+};
 
   // -----------------------
   const loadEmployees = async () => {
@@ -64,9 +108,7 @@ export default function Delegation() {
       const formattedTasks = res.data.map((t) => ({
         ...t,
         CreatedDate: t.CreatedDate,
-        Deadline: normalizeDate(t.Deadline),
-        Revision1: normalizeDate(t.Revision1),
-        Revision2: normalizeDate(t.Revision2),
+        Deadline:t.Deadline,
         FinalDate: t.FinalDate,
       }));
 
@@ -98,7 +140,7 @@ export default function Delegation() {
       setTasks(
         tasks.map((t) =>
           t.TaskID === taskID
-            ? { ...t, Status: "Completed", FinalDate: today }
+            ? { ...t, Status: "Completed", FinalDate: formatDateDDMMYYYYHHMMSS() }
             : t
         )
       );
@@ -123,7 +165,7 @@ export default function Delegation() {
     try {
       await axios.patch(
         `/delegations/shift/${shiftTask.TaskID}`,
-        { newDeadline: shiftDate, revisionField },
+        { newDeadline: normalizeDate(form.Deadline), revisionField },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
 
@@ -164,9 +206,7 @@ export default function Delegation() {
     try {
       const payload = {
         TaskName: form.TaskName,
-        Deadline: form.Deadline,
-        Priority: form.Priority,
-        Notes: form.Notes,
+        Deadline: normalizeDate(form.Deadline),
         Name: selectedEmp,
       };
       const res = await axios.post("/delegations/", payload, {
@@ -181,7 +221,7 @@ export default function Delegation() {
           Name: selectedEmp,
           TaskName: form.TaskName,
           Deadline: normalizeDate(form.Deadline),
-          CreatedDate: today,
+          CreatedDate: formatDateDDMMYYYYHHMMSS(),
           Revision1: "",
           Revision2: "",
           FinalDate: "",
@@ -234,9 +274,8 @@ export default function Delegation() {
     setEditTask(task);
     setForm({
       TaskName: task.TaskName,
-      Deadline: task.Deadline,
-      Priority: task.Priority,
-      Notes: task.Followup,
+      Deadline: normalizeDate(form.Deadline),
+
     });
   };
 
@@ -250,9 +289,8 @@ export default function Delegation() {
     try {
       const payload = {
         TaskName: form.TaskName,
-        Deadline: form.Deadline,
-        Priority: form.Priority,
-        Notes: form.Notes,
+        Deadline: normalizeDate(form.Deadline),
+
       };
 
       await axios.put(`/delegations/update/${editTask.TaskID}`, payload, {
@@ -294,21 +332,46 @@ export default function Delegation() {
 
 
   // -----------------------
-  const filteredTasks = tasks.filter((t) => {
-    if (activeTab === "pending") {
-      return t.Status !== "Completed" &&
-        (!t.Taskcompletedapproval || t.Taskcompletedapproval === "Pending" || t.Taskcompletedapproval === "NotApproved");
-    } else if (activeTab === "completed") {
-      return t.Status === "Completed" &&
-        (!t.Taskcompletedapproval || t.Taskcompletedapproval === "Pending" || t.Taskcompletedapproval === "NotApproved");
-    } else if (activeTab === "approved") {
-      return t.Status === "Completed" && t.Taskcompletedapproval === "Approved";
-    }
-    return false;
-  });
+  // const filteredTasks = tasks.filter((t) => {
 
-console.log("filteredTasks:",tasks);
+  //   if (activeTab === "pending") {
+  //     return t.Status !== "Completed" &&
+  //       (!t.Taskcompletedapproval || t.Taskcompletedapproval === "Pending" || t.Taskcompletedapproval === "NotApproved");
+  //   } else if (activeTab === "completed") {
+  //     return t.Status === "Completed" &&
+  //       (!t.Taskcompletedapproval || t.Taskcompletedapproval === "Pending" || t.Taskcompletedapproval === "NotApproved");
+  //   } else if (activeTab === "approved") {
+  //     return t.Status === "Completed" && t.Taskcompletedapproval === "Approved";
+  //   }else if (activeTab === "Today_Followup") {
+  //     return t.Deadline <= formatDateDDMMYYYYHHMMSS();
+  //   }
+  //   return false;
+  // });
 
+// Step 1: Sort tasks alphabetically by employee name
+const sortedTasks = tasks.sort((a, b) => {
+  // Ensure no undefined or null values for employee names, and handle them gracefully
+  const nameA = (a.Name || "").toLowerCase();  // Fallback to empty string if undefined or null
+  const nameB = (b.Name || "").toLowerCase();  // Fallback to empty string if undefined or null
+
+  return nameA.localeCompare(nameB); // Case-insensitive alphabetical sorting
+});
+
+// Step 2: Apply the filtering based on activeTab
+const filteredTasks = sortedTasks.filter((t) => {
+  if (activeTab === "pending") {
+    return t.Status !== "Completed" &&
+      (!t.Taskcompletedapproval || t.Taskcompletedapproval === "Pending" || t.Taskcompletedapproval === "NotApproved");
+  } else if (activeTab === "completed") {
+    return t.Status === "Completed" &&
+      (!t.Taskcompletedapproval || t.Taskcompletedapproval === "Pending" || t.Taskcompletedapproval === "NotApproved");
+  } else if (activeTab === "approved") {
+    return t.Status === "Completed" && t.Taskcompletedapproval === "Approved";
+  } else if (activeTab === "Today_Followup") {
+    return t.Deadline <= formatDateDDMMYYYYHHMMSS();
+  }
+  return false;
+});
 
   // -----------------------
   return (
@@ -324,9 +387,13 @@ console.log("filteredTasks:",tasks);
         >
           <option value="">-- Select Employee --</option>
             <option key={"all"} value={"all"}>{"All Delegation"}</option>
-          {employees.map((emp) => (
-            <option key={emp.name} value={emp.name}>{emp.name}</option>
-          ))}
+         {employees
+  .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())) // Sorting employees by name in alphabetical order
+  .map((emp) => (
+    <option key={emp.name} value={emp.name}>
+      {emp.name}
+    </option>
+  ))}
         </select>
       </div>
 
@@ -345,6 +412,9 @@ console.log("filteredTasks:",tasks);
       {/* Create Task Form */}
       {showCreate && (
         <div className="bg-white p-4 rounded shadow border mb-6">
+            <label htmlFor="taskName" className="block text-sm font-semibold mb-2">
+    Task Name
+  </label>
           <input
             type="text"
             placeholder="Task Name"
@@ -352,28 +422,16 @@ console.log("filteredTasks:",tasks);
             value={form.TaskName}
             onChange={(e) => setForm({ ...form, TaskName: e.target.value })}
           />
+            <label htmlFor="planDate" className="block text-sm font-semibold mb-2">
+    Plan Date
+  </label>
           <input
             type="date"
             className="w-full border p-2 rounded mb-2"
             value={form.Deadline}
             onChange={(e) => setForm({ ...form, Deadline: e.target.value })}
           />
-          <select
-            className="w-full border p-2 rounded mb-2"
-            value={form.Priority}
-            onChange={(e) => setForm({ ...form, Priority: e.target.value })}
-          >
-            <option value="">Priority</option>
-            <option value="Low">Low</option>
-            <option value="Normal">Normal</option>
-            <option value="High">High</option>
-          </select>
-          <textarea
-            placeholder="Notes"
-            className="w-full border p-2 rounded mb-2"
-            value={form.Notes}
-            onChange={(e) => setForm({ ...form, Notes: e.target.value })}
-          />
+   
           <button
             className="bg-green-600 text-white px-4 py-2 rounded"
             onClick={createTask}
@@ -417,6 +475,13 @@ console.log("filteredTasks:",tasks);
             >
               Approved
             </button>
+         <button
+              className={`px-3 py-2 rounded ${activeTab === "Today_Followup" ? "bg-purple-600 text-white" : "bg-gray-300"}`}
+              onClick={() => setActiveTab("Today_Followup")}
+            >
+              Today Followup
+            </button>
+
           </div>
 
           {/* Task List */}
@@ -430,7 +495,7 @@ console.log("filteredTasks:",tasks);
                       Created: {task.CreatedDate || "—"} <br />
                       Deadline: {task.Deadline || "—"} <br />
                       Completed: {task.FinalDate || "—"} <br />
-                      Priority: {task.Priority || "Normal"}<br />
+                      Revision: {task.Revisions || "0"}<br />
                       Name:{task.Name||"_"}
                     </div>
                   </div>
@@ -510,16 +575,49 @@ console.log("filteredTasks:",tasks);
 
       {/* Shift Modal */}
       {shiftTask && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+        // <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+        //   <div className="bg-white p-6 rounded shadow w-full max-w-sm">
+        //     <h3 className="font-bold mb-3">Shift Deadline for {shiftTask.TaskName}</h3>
+        //     <input
+        //       type="date"
+        //       className="w-full border p-2 rounded mb-3"
+        //       value={shiftDate}
+        //       onChange={(e) => setShiftDate(e.target.value)}
+        //     />
+        //     <div className="flex justify-end gap-3">
+        //       <button
+        //         className="bg-blue-600 text-white px-4 py-2 rounded"
+        //         onClick={confirmShift}
+        //         disabled={loadingShiftBtn}
+        //       >
+        //         {loadingShiftBtn ? "Processing..." : "Confirm"}
+        //       </button>
+        //       <button
+        //         className="px-4 py-2 border rounded"
+        //         onClick={() => setShiftTask(null)}
+        //       >
+        //         Cancel
+        //       </button>
+        //     </div>
+        //   </div>
+        // </div>
+
+
+         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded shadow w-full max-w-sm">
-            <h3 className="font-bold mb-3">Shift Deadline for {shiftTask.TaskName}</h3>
+            <h3 className="text-lg font-semibold mb-3">
+              Shift Deadline for {shiftTask.TaskName}
+            </h3>
             <input
               type="date"
               className="w-full border p-2 rounded mb-3"
-              value={shiftDate}
-              onChange={(e) => setShiftDate(e.target.value)}
+              value={form.Deadline}
+              // onChange={(e) => setShiftDate(e.target.value)}
+              onChange={(e) => setForm({ ...form, Deadline: e.target.value })}
+
+
             />
-            <div className="flex justify-end gap-3">
+            <div className="flex gap-3 justify-end">
               <button
                 className="bg-blue-600 text-white px-4 py-2 rounded"
                 onClick={confirmShift}
@@ -528,7 +626,7 @@ console.log("filteredTasks:",tasks);
                 {loadingShiftBtn ? "Processing..." : "Confirm"}
               </button>
               <button
-                className="px-4 py-2 border rounded"
+                className="px-4 py-2 rounded border"
                 onClick={() => setShiftTask(null)}
               >
                 Cancel
