@@ -3,145 +3,176 @@ import axios from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import customParseFormat from "dayjs/plugin/customParseFormat";  // Add this import
+import customParseFormat from "dayjs/plugin/customParseFormat";
 
 dayjs.extend(relativeTime);
-dayjs.extend(customParseFormat);  // Add this extension
+dayjs.extend(customParseFormat);
 
 export default function SupportTicket() {
   const { user } = useContext(AuthContext);
+
   const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ assignedTo: "", createdBy: "", status: "" });
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("");
   const [modalImage, setModalImage] = useState(null);
 
-  const authHeader = { headers: { Authorization: `Bearer ${user.token}` } };
+  const authHeader = {
+    headers: { Authorization: `Bearer ${user.token}` },
+  };
 
-  const loadTickets = async () => {
+  const loadTickets = async (status) => {
     setLoading(true);
     try {
-      // Only send filters if they are not empty
       const params = {};
-      if (filters.assignedTo) params.assignedTo = filters.assignedTo;
-      if (filters.createdBy) params.createdBy = filters.createdBy;
-      if (filters.status) params.status = filters.status;
+      if (status) params.status = status;
 
-      const res = await axios.get("/support-tickets/all", { ...authHeader, params });
+      const res = await axios.get("/support-tickets/all", {
+        ...authHeader,
+        params,
+      });
+
       setTickets(res.data.tickets || []);
     } catch (err) {
-      console.error("Failed to fetch tickets:", err);
-      alert("Failed to fetch tickets");
+      console.error(err);
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    loadTickets();
-  }, [filters]); // Reload when filters change
+    loadTickets("");
+  }, []);
 
-  const handleFilterChange = (e) => {
-    setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleTabClick = (status) => {
+    setActiveTab(status);
+    loadTickets(status);
   };
-
-  const resetFilters = () => {
-    setFilters({ assignedTo: "", createdBy: "", status: "" });
-  };
-
-  if (loading) return <div className="p-6 text-center">Loading tickets...</div>;
 
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-semibold mb-4">Support Tickets</h2>
+    <div className="p-6 h-full flex flex-col">
+      {/* HEADER */}
+      <h2 className="text-2xl font-semibold mb-4">
+        Support Tickets
+      </h2>
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded shadow mb-6 flex gap-4 flex-wrap">
-        <select
-          name="status"
-          value={filters.status}
-          onChange={handleFilterChange}
-          className="border p-2 rounded flex-1 min-w-[150px]"
-        >
-          <option value="">All Status</option>
-          <option value="Pending">Pending</option>
-          <option value="InProgress">InProgress</option>
-          <option value="Done">Done</option>
-        </select>
-        <button
-          onClick={resetFilters}
-          className="bg-red-600 text-white px-4 py-2 rounded"
-        >
-          Reset Filters
-        </button>
+      {/* TABS (STATIC) */}
+      <div className="bg-white p-4 rounded shadow mb-4 flex gap-2 flex-wrap">
+        {[
+          { label: "All Tickets", value: "" },
+          { label: "Pending", value: "Pending" },
+          { label: "In Progress", value: "InProgress" },
+          { label: "Completed", value: "Done" },
+        ].map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => handleTabClick(tab.value)}
+            className={`px-4 py-2 rounded font-medium ${
+              activeTab === tab.value
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Tickets List */}
-      <div className="grid gap-4">
-        {tickets.length === 0 && (
-          <div className="text-gray-500 text-center">No tickets available</div>
+      {/* SCROLLABLE DATA AREA */}
+      <div className="flex-1 overflow-y-auto pr-2">
+        {loading && (
+          <div className="text-center text-gray-500 py-6">
+            Loading tickets...
+          </div>
         )}
-        {tickets.map((t) => {
-          // Parse the backend date format using dayjs and customParseFormat
-          const createdDate = dayjs(t.CreatedDate, "DD/MM/YYYY HH:mm:ss");
 
-          return (
-            <div
-              key={t.TicketID}
-              className="bg-white p-4 rounded shadow flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-            >
-              <div className="flex-1">
-                <div className="font-semibold text-lg">{t.Issue}</div>
-                <div className="text-sm text-gray-600 mt-1">
-                  Created By: <span className="font-medium">{t.CreatedBy}</span>
-                </div>
-                <div className="text-sm text-gray-600">
-                  Assigned To: <span className="font-medium">{t.AssignedTo}</span>
-                </div>
-                <div className="text-sm text-gray-600">
-                  Created Date: {createdDate.format("DD MMM YYYY, HH:mm")}
-                </div>
-                <div className="text-sm text-gray-600">
-                  Elapsed: {createdDate.fromNow()}
-                </div>
-              </div>
+        {!loading && tickets.length === 0 && (
+          <div className="text-center text-gray-500 py-6">
+            No tickets available
+          </div>
+        )}
 
-              <div className="flex gap-2 mt-2 md:mt-0">
-                {t.IssuePhoto && (
-                  <button
-                    onClick={() => setModalImage(t.IssuePhoto)}
-                    className="bg-gray-700 text-white px-3 py-1 rounded hover:bg-gray-800"
-                  >
-                    View Image
-                  </button>
-                )}
-                <span className={`px-3 py-1 rounded ${
-                  t.Status === "Pending"
-                    ? "bg-yellow-400 text-black"
-                    : t.Status === "InProgress"
-                    ? "bg-blue-600 text-white"
-                    : "bg-green-600 text-white"
-                }`}>
-                  {t.Status}
-                </span>
-              </div>
-            </div>
-          );
-        })}
+        {!loading && (
+          <div className="grid gap-4">
+            {tickets.map((t) => {
+              const createdDate = dayjs(
+                t.CreatedDate,
+                "DD/MM/YYYY HH:mm:ss"
+              );
+
+              return (
+                <div
+                  key={t.TicketID}
+                  className="bg-white p-4 rounded shadow flex flex-col md:flex-row justify-between gap-4"
+                >
+                  <div className="flex-1">
+                    <div className="font-semibold text-lg">
+                      {t.Issue}
+                    </div>
+
+                    <div className="text-sm text-gray-600">
+                      Created By: <b>{t.CreatedBy}</b>
+                    </div>
+
+                    <div className="text-sm text-gray-600">
+                      Assigned To: <b>{t.AssignedTo}</b>
+                    </div>
+
+                    <div className="text-sm text-gray-600">
+                      {createdDate.format("DD MMM YYYY, HH:mm")}
+                    </div>
+
+                    <div className="text-sm text-gray-600">
+                      {createdDate.fromNow()}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {t.IssuePhoto && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setModalImage(t.IssuePhoto)
+                        }
+                        className="bg-gray-700 text-white px-3 py-1 rounded"
+                      >
+                        View Image
+                      </button>
+                    )}
+
+                    <span
+                      className={`px-3 py-1 rounded text-sm ${
+                        t.Status === "Pending"
+                          ? "bg-yellow-400 text-black"
+                          : t.Status === "InProgress"
+                          ? "bg-blue-600 text-white"
+                          : "bg-green-600 text-white"
+                      }`}
+                    >
+                      {t.Status}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Modal for Viewing Image */}
+      {/* IMAGE MODAL */}
       {modalImage && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
           <div className="relative">
             <button
+              type="button"
               onClick={() => setModalImage(null)}
-              className="absolute top-2 right-2 text-white bg-red-600 rounded-full w-8 h-8 flex items-center justify-center text-lg font-bold hover:bg-red-700"
+              className="absolute top-2 right-2 bg-red-600 text-white w-8 h-8 rounded-full"
             >
-              &times;
+              ×
             </button>
             <img
               src={modalImage}
               alt="Issue"
-              className="max-w-[90vw] max-h-[90vh] rounded shadow-lg object-contain"
+              className="max-w-[90vw] max-h-[90vh] rounded"
             />
           </div>
         </div>
