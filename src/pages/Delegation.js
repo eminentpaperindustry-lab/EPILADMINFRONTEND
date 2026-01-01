@@ -472,10 +472,10 @@ export default function Delegation() {
                   <div>
                     <div className="font-semibold text-lg">{task.TaskName}</div>
                     <div className="text-sm text-gray-600">
-                      Created: {task.CreatedDate || "—"}, <span/>
+                      Created: {task.CreatedDate || "—"}, <span/><span/>
                       Deadline: {task.Deadline || "—"}, <span />
                       Completed: {task.FinalDate || "—"}, <span />
-                      Revision: {task.Revisions || "0"},<span />
+                      Revision: {task.Revisions || "0"},<span /><span/>
                       Name: {task.Name || "_"}
                     </div>
                   </div>
