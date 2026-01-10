@@ -6,6 +6,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 export default function Delegation() {
   const { user } = useContext(AuthContext);
+const [assignBy, setAssignBy] = useState("");
 
   const [employees, setEmployees] = useState([]);
   const [selectedEmp, setSelectedEmp] = useState("");
@@ -46,6 +47,32 @@ export default function Delegation() {
     return `${dd}/${mm}/${yyyy} ${hh}:${min}:${ss}`;
   }
 
+  // ----------------------- Download Report
+  const downloadDelegationReport = () => {
+    if (!selectedEmp) { toast.warn("Select employee first"); return; }
+    const filtered = tasks.filter(t => t.Taskcompletedapproval !== "Approved");
+    if (filtered.length === 0) { toast.info("No tasks to download"); return; }
+
+    // Sort: Pending first, then Completed
+    filtered.sort((a,b)=>a.Status.localeCompare(b.Status));
+
+    const headers = ["TaskID","Name","TaskName","CreatedDate","Deadline","FinalDate","Revisions","Status"];
+    const rows = filtered.map(t => headers.map(h => `"${t[h] ?? ""}"`).join(","));
+    const csvContent = [headers.join(","), ...rows].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `delegation_report_${selectedEmp}_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("Delegation report downloaded");
+  };
+
+
   const normalizeDate = (date) => {
     if (!date) return "";
     const d = new Date(date || Date.now());
@@ -69,39 +96,138 @@ export default function Delegation() {
     }
   };
 
-  const loadUserTasks = async (name) => {
-    if (!name) return;
-    setLoading(true);
-    try {
-      const res = await axios.get(
-        `/delegations/search/by-name?name=${encodeURIComponent(name)}`,
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
+  // const loadUserTasks = async (name) => {
+  //   if (!name) return;
+  //   setLoading(true);
+  //   try {
+  //     const res = await axios.get(
+  //       `/delegations/search/by-name?name=${encodeURIComponent(name)}`,
+  //       { headers: { Authorization: `Bearer ${user.token}` } }
+  //     );
 
-      const formattedTasks = res.data.map((t) => ({
-        ...t,
-        CreatedDate: t.CreatedDate,
-        Deadline: t.Deadline,
-        FinalDate: t.FinalDate,
-      }));
+  //     const formattedTasks = res.data.map((t) => ({
+  //       ...t,
+  //       CreatedDate: t.CreatedDate,
+  //       Deadline: t.Deadline,
+  //       FinalDate: t.FinalDate,
+  //     }));
 
-      setTasks(formattedTasks);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to load tasks");
-      setTasks([]);
-    } finally {
-      setLoading(false);
+  //     setTasks(formattedTasks);
+  //   } catch (err) {
+  //     console.error(err);
+  //     toast.error("Failed to load tasks");
+  //     setTasks([]);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+  const loadUserTasks = async (name, assignByValue) => {
+  if (!name) return;
+  setLoading(true);
+  try {
+    let url = `/delegations/search/by-name?name=${encodeURIComponent(name)}`;
+
+    if (assignByValue && assignByValue !== "all") {
+      url += `&assignBy=${encodeURIComponent(assignByValue)}`;
     }
-  };
 
+    const res = await axios.get(url, {
+      headers: { Authorization: `Bearer ${user.token}` },
+    });
+
+    const formattedTasks = res.data.map((t) => ({
+      ...t,
+      CreatedDate: t.CreatedDate,
+      Deadline: t.Deadline,
+      FinalDate: t.FinalDate,
+    }));
+
+    setTasks(formattedTasks);
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to load tasks");
+    setTasks([]);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  
   useEffect(() => {
     if (user) loadEmployees();
   }, [user]);
 
+  // useEffect(() => {
+  //   if (selectedEmp) loadUserTasks(selectedEmp);
+  // }, [selectedEmp]);
+
   useEffect(() => {
-    if (selectedEmp) loadUserTasks(selectedEmp);
-  }, [selectedEmp]);
+  if (selectedEmp) {
+    loadUserTasks(selectedEmp, assignBy);
+  }
+}, [selectedEmp, assignBy]);
+
+
+  const createTask = async () => {
+    if (!selectedEmp) {
+      toast.warn("Select employee first");
+      return;
+    }
+    if (!form.TaskName || !form.Deadline) {
+      toast.warn("Task Name & Deadline required");
+      return;
+    }
+
+    setLoadingTaskId("create");
+    try {
+      const payload = {
+        TaskName: form.TaskName,
+        Deadline: normalizeDate(form.Deadline),
+        Name: selectedEmp,
+        AssignBy: assignBy
+      };
+      const res = await axios.post("/delegations/", payload, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      console.log("tsting: ", res);
+      if(res.data.ok === true){
+     
+  loadUserTasks();
+      setTasks([
+        {
+          TaskID: res.data.TaskID,
+          Name: selectedEmp,
+          TaskName: form.TaskName,
+          Deadline: normalizeDate(form.Deadline),
+          CreatedDate: formatDateDDMMYYYYHHMMSS(),
+          Revision1: "",
+          Revision2: "",
+          FinalDate: "",
+          Revisions: 0,
+          Priority: form.Priority,
+          Status: "Pending",
+          AssignBy: assignBy,
+          Taskcompletedapproval: "Pending",
+        },
+        ...tasks,
+      ]);
+
+      setForm({ TaskName: "", Deadline: "", Priority: "", Notes: "" });
+      setShowCreate(false);
+      toast.success("Task created successfully");
+}else{
+   toast.error("Failed to create task Technical Issue Please Re Create");
+}
+
+  
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to create task");
+    } finally {
+      setLoadingTaskId(null);
+    }
+  };
 
   // -----------------------
   const handleDone = async (taskID) => {
@@ -172,64 +298,7 @@ export default function Delegation() {
     }
   };
 
-  const createTask = async () => {
-    if (!selectedEmp) {
-      toast.warn("Select employee first");
-      return;
-    }
-    if (!form.TaskName || !form.Deadline) {
-      toast.warn("Task Name & Deadline required");
-      return;
-    }
-
-    setLoadingTaskId("create");
-    try {
-      const payload = {
-        TaskName: form.TaskName,
-        Deadline: normalizeDate(form.Deadline),
-        Name: selectedEmp,
-      };
-      const res = await axios.post("/delegations/", payload, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      console.log("tsting: ", res);
-      if(res.data.ok === true){
-     
-  loadUserTasks();
-      setTasks([
-        {
-          TaskID: res.data.TaskID,
-          Name: selectedEmp,
-          TaskName: form.TaskName,
-          Deadline: normalizeDate(form.Deadline),
-          CreatedDate: formatDateDDMMYYYYHHMMSS(),
-          Revision1: "",
-          Revision2: "",
-          FinalDate: "",
-          Revisions: 0,
-          Priority: form.Priority,
-          Status: "Pending",
-          Followup: form.Notes,
-          Taskcompletedapproval: "Pending",
-        },
-        ...tasks,
-      ]);
-
-      setForm({ TaskName: "", Deadline: "", Priority: "", Notes: "" });
-      setShowCreate(false);
-      toast.success("Task created successfully");
-}else{
-   toast.error("Failed to create task Technical Issue Please Re Create");
-}
-
   
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to create task");
-    } finally {
-      setLoadingTaskId(null);
-    }
-  };
 
   const handleApprovalChange = async (taskID, value) => {
     setLoadingApprovalId(taskID);
@@ -258,46 +327,50 @@ export default function Delegation() {
       setLoadingApprovalId(null);
     }
   };
+const editTaskDetails = (task) => {
+  setEditTask(task);
+  setForm({
+    TaskName: task.TaskName,
+    Deadline: task.Deadline, // sirf show ke liye, edit nahi hoga
+    Priority: task.Priority,
+    Notes: task.Followup,
+  });
+};
+const updateTask = async () => {
+  if (!form.TaskName) {
+    toast.warn("Task Name is required");
+    return;
+  }
 
-  const editTaskDetails = (task) => {
-    setEditTask(task);
-    setForm({
-      TaskName: task.TaskName,
-      Deadline: task.Deadline,
+  setLoadingTaskId("update");
+  try {
+    const payload = {
+      TaskName: form.TaskName, // ✅ ONLY NAME
+    };
+
+    await axios.put(`/delegations/update/${editTask.TaskID}`, payload, {
+      headers: { Authorization: `Bearer ${user.token}` },
     });
-  };
 
-  const updateTask = async () => {
-    if (!form.TaskName || !form.Deadline) {
-      toast.warn("Task Name and Deadline are required");
-      return;
-    }
+    setTasks(
+      tasks.map((t) =>
+        t.TaskID === editTask.TaskID
+          ? { ...t, TaskName: form.TaskName }
+          : t
+      )
+    );
 
-    setLoadingTaskId("update");
-    try {
-      const payload = {
-        TaskName: form.TaskName,
-        Deadline: normalizeDate(form.Deadline),
-      };
+    setEditTask(null);
+    setForm({ TaskName: "", Deadline: "", Priority: "", Notes: "" });
+    toast.success("Task updated successfully");
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to update task");
+  } finally {
+    setLoadingTaskId(null);
+  }
+};
 
-      await axios.put(`/delegations/update/${editTask.TaskID}`, payload, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-
-      setTasks(
-        tasks.map((t) => (t.TaskID === editTask.TaskID ? { ...t, ...payload } : t))
-      );
-
-      setEditTask(null);
-      setForm({ TaskName: "", Deadline: "", Priority: "", Notes: "" });
-      toast.success("Task updated successfully");
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to update task");
-    } finally {
-      setLoadingTaskId(null);
-    }
-  };
 
   const deleteTask = async (taskID) => {
     setLoadingTaskId(taskID);
@@ -349,36 +422,70 @@ export default function Delegation() {
   return (
     <div className="p-4 max-w-4xl mx-auto">
       {/* Employee Select */}
-      <div className="mb-6">
-        <label className="block mb-2 font-semibold">Select Employee</label>
-        <select
-          className="w-full border p-2 rounded"
-          value={selectedEmp}
-          onChange={(e) => setSelectedEmp(e.target.value)}
-        >
-          <option value="">-- Select Employee --</option>
-          <option key={"all"} value={"all"}>
-            All Delegation
+   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+  {/* Select Employee */}
+  <div>
+    <label className="block mb-1 text-sm font-medium text-gray-700">
+      Select Employee
+    </label>
+    <select
+      className="w-full h-11 rounded-md border border-gray-300 bg-white px-3 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
+                 hover:border-gray-400 transition"
+      value={selectedEmp}
+      onChange={(e) => setSelectedEmp(e.target.value)}
+    >
+      <option value="">-- Select Employee --</option>
+      <option value="all">All Delegation</option>
+      {employees
+        .sort((a, b) =>
+          a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+        )
+        .map((emp) => (
+          <option key={emp.name} value={emp.name}>
+            {emp.name}
           </option>
-          {employees
-            .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
-            .map((emp) => (
-              <option key={emp.name} value={emp.name}>
-                {emp.name}
-              </option>
-            ))}
-        </select>
-      </div>
+        ))}
+    </select>
+  </div>
+
+  {/* Assign By */}
+  <div>
+    <label className="block mb-1 text-sm font-medium text-gray-700">
+      Assign By
+    </label>
+    <select
+      className="w-full h-11 rounded-md border border-gray-300 bg-white px-3 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
+                 hover:border-gray-400 transition"
+      value={assignBy}
+      onChange={(e) => setAssignBy(e.target.value)}
+    >
+      <option value="">-- Select Assign By --</option>
+      <option value="Aman Agarwal">Aman Agarwal</option>
+      <option value="Kanishk Agarwal">Kanishk Agarwal</option>
+      <option value="Ritesh Agarwal">Ritesh Agarwal</option>
+      <option value="all">All Assign</option>
+    </select>
+  </div>
+</div>
+
+
 
       {/* Create Task Button */}
       {selectedEmp && (
-        <div className="mb-6">
+        <div className="mb-6 flex gap-3">
           <button
             className="bg-blue-600 text-white px-4 py-2 rounded"
             onClick={() => setShowCreate(!showCreate)}
           >
             {showCreate ? "Cancel" : "Create Task"}
           </button>
+
+       <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={downloadDelegationReport}>
+            Download Report
+          </button>
+
         </div>
       )}
 
@@ -499,12 +606,12 @@ export default function Delegation() {
                   >
                     Edit
                   </button>
-                  <button
+                  {/* <button
                     onClick={() => setDeleteTaskId(task.TaskID)}
                     className="bg-red-600 text-white px-4 py-2 rounded"
                   >
                     Delete
-                  </button>
+                  </button> */}
                   {activeTab === "pending" && task.Status !== "Completed" && (
                     <>
                       {/* <button
@@ -551,6 +658,42 @@ export default function Delegation() {
           </div>
         </>
       )}
+{editTask && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded shadow w-full max-w-md">
+      <h2 className="text-lg font-semibold mb-4">Edit Task Name</h2>
+
+      <label className="block text-sm font-semibold mb-2">
+        Task Name
+      </label>
+      <input
+        type="text"
+        className="w-full border p-2 rounded mb-4"
+        value={form.TaskName}
+        onChange={(e) =>
+          setForm({ ...form, TaskName: e.target.value })
+        }
+      />
+
+      <div className="flex justify-end gap-3">
+        <button
+          className="px-4 py-2 bg-gray-400 text-white rounded"
+          onClick={() => setEditTask(null)}
+        >
+          Cancel
+        </button>
+
+        <button
+          className="px-4 py-2 bg-green-600 text-white rounded"
+          onClick={updateTask}
+          disabled={loadingTaskId === "update"}
+        >
+          {loadingTaskId === "update" ? "Updating..." : "Update"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Toast Container */}
       <ToastContainer
