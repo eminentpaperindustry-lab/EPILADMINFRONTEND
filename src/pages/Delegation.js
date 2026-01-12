@@ -85,12 +85,23 @@ const downloadDelegationReport = () => {
     t => t.Taskcompletedapproval !== "Approved"
   );
 
+
+
+
   if (filtered.length === 0) {
     toast.info("No tasks to download");
     return;
   }
 
-  filtered.sort((a, b) => a.Status.localeCompare(b.Status));
+  // filtered.sort((a, b) => a.Status.localeCompare(b.Status));
+filtered.sort((a, b) => {
+  // 1️⃣ Pehle Name ke hisaab se
+  const nameCompare = (a.Name || "").localeCompare(b.Name || "");
+  if (nameCompare !== 0) return nameCompare;
+
+  // 2️⃣ Same Name wale tasks me Status ke hisaab se order
+  return (a.Status || "").localeCompare(b.Status || "");
+});
 
   const doc = new jsPDF({
     orientation: "portrait",
