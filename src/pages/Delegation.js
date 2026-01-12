@@ -3,6 +3,8 @@ import axios from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export default function Delegation() {
   const { user } = useContext(AuthContext);
@@ -48,29 +50,97 @@ const [assignBy, setAssignBy] = useState("");
   }
 
   // ----------------------- Download Report
-  const downloadDelegationReport = () => {
-    if (!selectedEmp) { toast.warn("Select employee first"); return; }
-    const filtered = tasks.filter(t => t.Taskcompletedapproval !== "Approved");
-    if (filtered.length === 0) { toast.info("No tasks to download"); return; }
+  // const downloadDelegationReport = () => {
+  //   if (!selectedEmp) { toast.warn("Select employee first"); return; }
+  //   const filtered = tasks.filter(t => t.Taskcompletedapproval !== "Approved");
+  //   if (filtered.length === 0) { toast.info("No tasks to download"); return; }
 
-    // Sort: Pending first, then Completed
-    filtered.sort((a,b)=>a.Status.localeCompare(b.Status));
+  //   // Sort: Pending first, then Completed
+  //   filtered.sort((a,b)=>a.Status.localeCompare(b.Status));
 
-    const headers = ["TaskID","Name","TaskName","CreatedDate","Deadline","FinalDate","Revisions","Status"];
-    const rows = filtered.map(t => headers.map(h => `"${t[h] ?? ""}"`).join(","));
-    const csvContent = [headers.join(","), ...rows].join("\n");
+  //   const headers = ["TaskID","Name","TaskName","CreatedDate","Deadline","FinalDate","Revisions","Status"];
+  //   const rows = filtered.map(t => headers.map(h => `"${t[h] ?? ""}"`).join(","));
+  //   const csvContent = [headers.join(","), ...rows].join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `delegation_report_${selectedEmp}_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success("Delegation report downloaded");
-  };
+  //   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  //   const url = URL.createObjectURL(blob);
+  //   const link = document.createElement("a");
+  //   link.href = url;
+  //   link.setAttribute("download", `delegation_report_${selectedEmp}_${new Date().toISOString().slice(0,10)}.csv`);
+  //   document.body.appendChild(link);
+  //   link.click();
+  //   document.body.removeChild(link);
+  //   URL.revokeObjectURL(url);
+  //   toast.success("Delegation report downloaded");
+  // };
+
+
+const downloadDelegationReport = () => {
+  if (!selectedEmp) {
+    toast.warn("Select employee first");
+    return;
+  }
+
+  const filtered = tasks.filter(
+    t => t.Taskcompletedapproval !== "Approved"
+  );
+
+  if (filtered.length === 0) {
+    toast.info("No tasks to download");
+    return;
+  }
+
+  filtered.sort((a, b) => a.Status.localeCompare(b.Status));
+
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  doc.setFontSize(14);
+  doc.text(`Delegation Report - ${selectedEmp}`, 14, 15);
+
+  autoTable(doc, {
+    head: [[
+      "Name",
+      "Task Name",
+      "Created Date",
+      "Deadline",
+      "Final Date",
+      "Revisions",
+      "Status"
+    ]],
+    body: filtered.map(t => [
+      t.Name || "",
+      t.TaskName || "",
+      t.CreatedDate || "--",
+      t.Deadline || "--",
+      t.FinalDate || "--",
+      t.Revisions || "--",
+      t.Status 
+    ]),
+    startY: 22,
+    theme: "grid",
+    styles: {
+      fontSize: 9,
+      cellPadding: 2,
+      overflow: "linebreak",
+    },
+    columnStyles: {
+      1: { cellWidth: 60 }, // Task Name column (spaces + long text)
+      0:{cellWidth:20}
+    },
+  });
+
+  doc.save(
+    `delegation_report_${selectedEmp}_${new Date()
+      .toISOString()
+      .slice(0, 10)}.pdf`
+  );
+
+  toast.success("Delegation report downloaded");
+};
 
 
   const normalizeDate = (date) => {
