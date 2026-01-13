@@ -434,143 +434,72 @@ const [loadingDownload, setLoadingDownload] = useState(false);
     if (selectedEmp) loadChecklists(selectedEmp);
   }, [selectedEmp]);
 
-const downloadChecklistReport = async () => {
+const sendPendingChecklistWhatsApp = async () => {
   if (!selectedEmp) {
     toast.warn("Select employee first");
     return;
   }
 
-    setLoadingDownload(true);
+  setLoadingDownload(true);
+
   try {
     // 🔹 TODAY DATE
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // 🔹 API CALL
+    // 🔹 API CALL → fetch checklist
     const res = await axios.get(`/checklist/search/by-name`, {
       headers: { Authorization: `Bearer ${user.token}` },
       params: { name: selectedEmp },
     });
 
-    // 🔹 FILTER → pending + aaj/past planned
-    const data = (res.data || [])
-      .filter((t) => {
-        if (!t.Planned) return false;
+    // 🔹 FILTER → only pending + planned today or earlier
+    const data = (res.data || []).filter((t) => {
+      if (!t.Planned) return false;
+      if (t.Actual) return false; // only pending
 
-        // Only pending tasks
-        if (t.Actual) return false;
+      const [datePart, timePart] = t.Planned.split(" ");
+      const [day, month, year] = datePart.split("/");
+      const [hour, minute, second] = timePart.split(":");
 
-        const [datePart, timePart] = t.Planned.split(" ");
-        const [day, month, year] = datePart.split("/");
-        const [hour, minute, second] = timePart.split(":");
+      const plannedDate = new Date(year, month - 1, day, hour, minute, second);
+      plannedDate.setHours(0, 0, 0, 0);
 
-        const plannedDate = new Date(
-          year,
-          month - 1,
-          day,
-          hour,
-          minute,
-          second
-        );
-
-        plannedDate.setHours(0, 0, 0, 0);
-
-        return plannedDate <= today;
-      })
-
-      // 🔹 SORT → Name first, then Planned date
-      .sort((a, b) => {
-        const nameCompare = (a.Name || "").localeCompare(b.Name || "");
-        if (nameCompare !== 0) return nameCompare;
-
-        const d1 = new Date(a.Planned.split(" ")[0].split("/").reverse().join("-"));
-        const d2 = new Date(b.Planned.split(" ")[0].split("/").reverse().join("-"));
-        return d1 - d2;
-      });
+      return plannedDate <= today;
+    });
 
     if (data.length === 0) {
-      toast.info("No pending checklist data to download");
+      toast.info("No pending checklist tasks to send");
       return;
     }
 
-    // 🔹 PDF
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
+    // 🔹 Prepare task list text
+    const taskList = data.map((c, i) => `${i + 1}. ${c.Task}`).join("\n");
 
-    doc.setFontSize(14);
-    doc.text(
-      `Pending Checklist Report - ${selectedEmp}`,
-      14,
-      15
+    // 🔹 Find employee WhatsApp number
+    const empObj = employees.find(emp => emp.name === selectedEmp);
+    if (!empObj || !empObj.number) {
+      toast.warn("Employee WhatsApp number not found");
+      return;
+    }
+
+    const whatsappNumber = empObj.number;
+    const msg = encodeURIComponent(
+      `Hi ${selectedEmp}, please complete your pending tasks:\n\n${taskList}`
     );
 
-    autoTable(doc, {
-      head: [[
-        "Name",
-        "Task",
-        "Frequency",
-        "Planned",
-        "Status"
-      ]],
-      body: data.map((c) => [
-        c.Name || "",
-        c.Task || "",
-        c.Freq === "D"
-          ? "Daily"
-          : c.Freq === "W"
-          ? "Weekly"
-          : c.Freq === "M"
-          ? "Monthly"
-          : "Yearly",
-        c.Planned || "--",
-        "Pending"
-      ]),
-      startY: 22,
-      theme: "grid",
-      styles: {
-        fontSize: 9,
-        cellPadding: 2,
-      },
-      columnStyles: {
-        0: { cellWidth: 25 },
-        1: { cellWidth: 55 },
-      },
-    });
+    // 🔹 Open WhatsApp
+    window.open(`https://wa.me/${whatsappNumber}?text=${msg}`, "_blank");
 
-    doc.save(
-      `pending_checklist_${selectedEmp}_${new Date()
-        .toISOString()
-        .slice(0, 10)}.pdf`
-    );
-
-    toast.success("Pending checklist downloaded successfully");
-    const fileName = `pending_checklist_${selectedEmp}_${new Date().toISOString().slice(0, 10)}.pdf`;
-
-        // ---------------- WhatsApp Send ----------------
-    // Convert PDF to Base64 or host file somewhere first
-    // Quick option: Send simple text message with file name
- // Find employee object by name
-const empObj = employees.find(emp => emp.name === selectedEmp);
-
-if (empObj && empObj.number) {
-  const whatsappNumber = empObj.number;
-  const msg = encodeURIComponent(`Hi ${selectedEmp}, kindly complete your pending checklist on time to keep your score perfect 😊.`);
-  window.open(`https://wa.me/${whatsappNumber}?text=${msg}`, "_blank");
-} else {
-  toast.warn("Employee WhatsApp number not found");
-}
-
+    toast.success("Pending tasks sent to WhatsApp");
 
   } catch (err) {
-    toast.error("Failed to download pending checklist");
-  }
-  finally {
-    setLoadingDownload(false); // End loading
+    toast.error("Failed to send pending tasks");
+  } finally {
+    setLoadingDownload(false);
   }
 };
+
 
 
   // ---------------- UI ----------------
@@ -597,7 +526,7 @@ if (empObj && empObj.number) {
 
       <button
   className="bg-gray-700 text-white px-4 py-2 rounded mb-4"
-  onClick={downloadChecklistReport}
+  onClick={sendPendingChecklistWhatsApp}
 
    disabled={loadingDownload} // Disable while loading
 >
