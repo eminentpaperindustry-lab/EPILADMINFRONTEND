@@ -11,6 +11,8 @@ export default function Delegation() {
 const [assignBy, setAssignBy] = useState("");
 
   const [employees, setEmployees] = useState([]);
+  const [admin, setAdmin] = useState([]);
+
   const [selectedEmp, setSelectedEmp] = useState("");
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -176,6 +178,17 @@ filtered.sort((a, b) => {
       toast.error("Failed to load employees");
     }
   };
+    const loadAdmin = async () => {
+    try {
+      const res = await axios.get("/employee/allAdmin", {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      setAdmin(res.data || []);
+    } catch (err) {
+      console.error("Failed to load Admin", err);
+      toast.error("Failed to load Admin");
+    }
+  };
 
   // const loadUserTasks = async (name) => {
   //   if (!name) return;
@@ -236,7 +249,10 @@ filtered.sort((a, b) => {
 
   
   useEffect(() => {
-    if (user) loadEmployees();
+    if (user) {
+      loadEmployees()
+      loadAdmin()
+    };
   }, [user]);
 
   // useEffect(() => {
@@ -535,19 +551,33 @@ const updateTask = async () => {
     <label className="block mb-1 text-sm font-medium text-gray-700">
       Assign By
     </label>
-    <select
-      className="w-full h-11 rounded-md border border-gray-300 bg-white px-3 text-sm
-                 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                 hover:border-gray-400 transition"
-      value={assignBy}
-      onChange={(e) => setAssignBy(e.target.value)}
-    >
-      <option value="">-- Select Assign By --</option>
-      <option value="Aman Agarwal">Aman Agarwal</option>
-      <option value="Kanishk Agarwal">Kanishk Agarwal</option>
-      <option value="Ritesh Agarwal">Ritesh Agarwal</option>
-      <option value="all">All Assign</option>
-    </select>
+<select
+  className="w-full rounded-md border border-gray-300 bg-white
+             px-3 py-2 text-sm
+             focus:outline-none focus:ring-2 focus:ring-emerald-500
+             hover:border-gray-400 transition"
+  value={assignBy}
+  onChange={(e) => setAssignBy(e.target.value)}
+>
+  {/* Placeholder – dropdown me nahi dikhega */}
+  <option value="" disabled hidden>
+    -- Select Assign By --
+  </option>
+
+  {admin
+    .filter(emp => typeof emp?.name === "string" && emp.name.trim() !== "")   // safety
+    .sort((a, b) =>
+      a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+    )
+    .map((emp) => (
+      <option key={emp.name} value={emp.name}>
+        {emp.name}
+      </option>
+    ))}
+
+  <option value="all">All Assign</option>
+</select>
+
   </div>
 </div>
 
@@ -626,6 +656,14 @@ const updateTask = async () => {
             >
               Pending / Shifted
             </button>
+                <button
+              className={`px-3 py-2 rounded ${
+                activeTab === "Today_Followup" ? "bg-purple-600 text-white" : "bg-gray-300"
+              }`}
+              onClick={() => setActiveTab("Today_Followup")}
+            >
+              Today Followup
+            </button>
             <button
               className={`px-3 py-2 rounded ${
                 activeTab === "completed" ? "bg-green-600 text-white" : "bg-gray-300"
@@ -642,14 +680,7 @@ const updateTask = async () => {
             >
               Approved
             </button>
-            <button
-              className={`px-3 py-2 rounded ${
-                activeTab === "Today_Followup" ? "bg-purple-600 text-white" : "bg-gray-300"
-              }`}
-              onClick={() => setActiveTab("Today_Followup")}
-            >
-              Today Followup
-            </button>
+        
           </div>
 
           {/* Task List */}
