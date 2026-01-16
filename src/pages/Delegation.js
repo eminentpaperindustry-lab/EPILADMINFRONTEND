@@ -156,6 +156,91 @@ filtered.sort((a, b) => {
 };
 
 
+const sendPendingDelegationWhatsApp = async () => {
+  if (!selectedEmp) {
+    toast.warn("Select employee first");
+    return;
+  }
+
+  try {
+    const pending = tasks.filter(
+      t =>
+        t.Deadline <= formatDateDDMMYYYYHHMMSS() &&
+        t.Status !== "Completed"
+    );
+
+    if (pending.length === 0) {
+      toast.info("No pending delegation tasks");
+      return;
+    }
+
+    // helper
+    const sendWA = async (empName, empNumber, empTasks) => {
+      if (!empNumber || empTasks.length === 0) return;
+
+      const payload = {
+        number: `91${empNumber}`,
+        employeeName: empName,
+        delegations: empTasks.map(t => t.TaskName) // ✅ ARRAY
+      };
+
+      console.log("WA Payload 👉", payload); // 🧪 DEBUG (important)
+
+      await axios.post(
+        "/whatsapp/send-delegation",   // ✅ CORRECT API
+        payload,
+        {
+          headers: { Authorization: `Bearer ${user.token}` }
+        }
+      );
+    };
+
+    // 🔹 ALL case
+    if (selectedEmp === "all") {
+      const map = {};
+
+      pending.forEach(t => {
+        if (!t.Name) return;
+        if (!map[t.Name]) map[t.Name] = [];
+        map[t.Name].push(t);
+      });
+
+      await Promise.all(
+        Object.keys(map).map(name => {
+          const emp = employees.find(e => e.name === name);
+          if (!emp?.number) return;
+          return sendWA(name, emp.number, map[name]);
+        })
+      );
+
+      toast.success("All employees ko delegation WhatsApp bhej diya 🚀");
+      return;
+    }
+
+    // 🔹 Single employee
+    const empTasks = pending.filter(t => t.Name === selectedEmp);
+    if (empTasks.length === 0) {
+      toast.info("No pending tasks");
+      return;
+    }
+
+    const emp = employees.find(e => e.name === selectedEmp);
+    if (!emp?.number) {
+      toast.warn("Employee WhatsApp number missing");
+      return;
+    }
+
+    await sendWA(selectedEmp, emp.number, empTasks);
+    toast.success("Delegation WhatsApp sent ✅");
+
+  } catch (err) {
+    console.error(err);
+    toast.error("WhatsApp send failed ❌");
+  }
+};
+
+
+
   const normalizeDate = (date) => {
     if (!date) return "";
     const d = new Date(date || Date.now());
@@ -583,7 +668,7 @@ const updateTask = async () => {
 
 
 
-      {/* Create Task Button */}
+      {/* Create Task And Download  Button */}
       {selectedEmp && (
         <div className="mb-6 flex gap-3">
           <button
@@ -596,6 +681,10 @@ const updateTask = async () => {
        <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={downloadDelegationReport}>
             Download Report
           </button>
+
+           {/* <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={sendPendingDelegationWhatsApp}> */}
+            {/* Pending Task Flowup  */}
+          {/* </button> */}
 
         </div>
       )}
