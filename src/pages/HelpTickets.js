@@ -55,9 +55,9 @@ export default function HelpTickets() {
   const loadCreatedTickets = async () => {
     try {
       const res = await axios.get("/helpTickets/created", authHeader);
-      console.log("res.tickets:", res.tickets, "temp: ",res);
+      console.log("res.tickets:", res.data, "temp: ",res.data);
       
-      setCreatedTickets(res.tickets || []);
+      setCreatedTickets(res.data || []);
       loadTickets();
     } catch (err) {
       console.error(err);

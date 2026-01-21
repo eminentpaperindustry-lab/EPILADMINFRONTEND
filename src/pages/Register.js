@@ -13,6 +13,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -75,14 +76,22 @@ export default function Register() {
           />
 
           <label className="text-gray-700 font-medium">Password</label>
-          <input
-            type="password"
-            placeholder="Enter password"
-            className="w-full border border-gray-300 p-2 rounded mb-4 mt-1 focus:ring-2 focus:ring-blue-400 outline-none"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+<div className="relative mb-4 mt-1">
+  <input
+    type={showPassword ? "text" : "password"}
+    placeholder="Enter password"
+    className="w-full border border-gray-300 p-2 rounded pr-10 focus:ring-2 focus:ring-blue-400 outline-none"
+    value={password}
+    onChange={(e) => setPassword(e.target.value)}
+  />
 
+  <span
+    className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-500 select-none"
+    onClick={() => setShowPassword(!showPassword)}
+  >
+    {showPassword ? "🙈" : "👁️"}
+  </span>
+</div>
           <label className="text-gray-700 font-medium">Department</label>
           <input
             type="text"
