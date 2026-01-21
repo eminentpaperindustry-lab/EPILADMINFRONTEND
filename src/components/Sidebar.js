@@ -103,12 +103,13 @@ export default function Sidebar({ mobile }) {
           <nav className="p-6 space-y-2">
             <MenuItem to="/delegation" icon={FaTasks} onClick={closeSidebar}>Delegation</MenuItem>
             <MenuItem to="/checklist" icon={FaClipboardList} onClick={closeSidebar}>Checklist</MenuItem>
+              <MenuItem to="/help-ticket" icon={FaLifeRing} onClick={closeSidebar} count={helpTicketCount}>
+              Help Ticket
+            </MenuItem>
             <MenuItem to="/support-ticket" icon={FaHeadset} onClick={closeSidebar} count={supportTicketCount}>
               Support Ticket
             </MenuItem>
-            <MenuItem to="/help-ticket" icon={FaLifeRing} onClick={closeSidebar} count={helpTicketCount}>
-              Help Ticket
-            </MenuItem>
+          
           </nav>
         </aside>
 
@@ -128,12 +129,13 @@ export default function Sidebar({ mobile }) {
       <nav className="p-6 space-y-2">
         <MenuItem to="/delegation" icon={FaTasks} count={0}>Delegation</MenuItem>
         <MenuItem to="/checklist" icon={FaClipboardList} count={0}>Checklist</MenuItem>
+           <MenuItem to="/help-ticket" icon={FaLifeRing} count={helpTicketCount}>
+          Help Ticket
+        </MenuItem>
         <MenuItem to="/support-ticket" icon={FaHeadset} count={supportTicketCount}>
           Support Ticket
         </MenuItem>
-        <MenuItem to="/help-ticket" icon={FaLifeRing} count={helpTicketCount}>
-          Help Ticket
-        </MenuItem>
+     
       </nav>
     </aside>
   );

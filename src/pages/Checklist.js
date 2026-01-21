@@ -119,27 +119,41 @@ const [loadingDownload, setLoadingDownload] = useState(false);
         const freq = c.Freq;
 
         // -------- PENDING --------
-        if (activeTab === "pending") {
+        // if (activeTab === "pending") {
+        //   if (isDone) return false;
+
+        //   if (freq === "D" && plannedDate < today) return true;
+
+        //   if (freq === "W") {
+        //     const { end } = getWeekRange(plannedDate);
+        //     return end < today;
+        //   }
+
+        //   if (freq === "M") {
+        //     return (
+        //       plannedDate.getFullYear() < today.getFullYear() ||
+        //       (plannedDate.getFullYear() === today.getFullYear() &&
+        //         plannedDate.getMonth() < today.getMonth())
+        //     );
+        //   }
+
+        //   if (freq === "Y") {
+        //     return plannedDate.getFullYear() < today.getFullYear();
+        //   }
+
+        //   return false;
+        // }
+
+          if (activeTab === "pending") {
           if (isDone) return false;
 
           if (freq === "D" && plannedDate < today) return true;
 
-          if (freq === "W") {
-            const { end } = getWeekRange(plannedDate);
-            return end < today;
-          }
+          if (freq === "W" && plannedDate < today) return true;
 
-          if (freq === "M") {
-            return (
-              plannedDate.getFullYear() < today.getFullYear() ||
-              (plannedDate.getFullYear() === today.getFullYear() &&
-                plannedDate.getMonth() < today.getMonth())
-            );
-          }
+          if (freq === "M" && plannedDate < today) return true;
 
-          if (freq === "Y") {
-            return plannedDate.getFullYear() < today.getFullYear();
-          }
+          if (freq === "Y" && plannedDate < today) return true;
 
           return false;
         }
