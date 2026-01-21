@@ -7,6 +7,8 @@ import { ToastContainer, toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useRef } from "react";
+
 
 export default function Checklist() {
   const { user } = useContext(AuthContext);
@@ -18,7 +20,8 @@ export default function Checklist() {
   const [employees, setEmployees] = useState([]);
   const [employeeLoading, setEmployeeLoading] = useState(false);  // Loading state for employee data
 const [loadingDownload, setLoadingDownload] = useState(false);
-  
+  const whatsappRef = useRef(null);
+
   // ---------------- DATE PARSER ----------------
   const parseDate = (d) => {
     if (!d) return null;
@@ -313,63 +316,62 @@ const sendPendingChecklistWhatsApp = async () => {
     return;
   }
 
-  setLoadingDownload(true);
+  // 🔥 MUST BE FIRST LINE (NO STATE CHANGE BEFORE)
+  whatsappRef.current = window.open("", "_blank");
+
+  if (!whatsappRef.current) {
+    toast.error("Popup blocked. Allow popups for this site.");
+    return;
+  }
+
+  whatsappRef.current.document.write("Preparing WhatsApp message...");
 
   try {
-    // 🔹 TODAY DATE
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // 🔹 API CALL → fetch checklist
     const res = await axios.get(`/checklist/search/by-name`, {
       headers: { Authorization: `Bearer ${user.token}` },
       params: { name: selectedEmp },
     });
 
-    // 🔹 FILTER → only pending + planned today or earlier
     const data = (res.data || []).filter((t) => {
-      if (!t.Planned) return false;
-      if (t.Actual) return false; // only pending
-
-      const [datePart, timePart] = t.Planned.split(" ");
-      const [day, month, year] = datePart.split("/");
-      const [hour, minute, second] = timePart.split(":");
-
-      const plannedDate = new Date(year, month - 1, day, hour, minute, second);
+      if (!t.Planned || t.Actual) return false;
+      const [d, m, y] = t.Planned.split(" ")[0].split("/");
+      const plannedDate = new Date(y, m - 1, d);
       plannedDate.setHours(0, 0, 0, 0);
-
       return plannedDate <= today;
     });
 
-    if (data.length === 0) {
-      toast.info("No pending checklist tasks to send");
+    if (!data.length) {
+      whatsappRef.current.close();
+      toast.info("No pending tasks");
       return;
     }
 
-    // 🔹 Prepare task list text
     const taskList = data.map((c, i) => `${i + 1}. ${c.Task}`).join("\n");
 
-    // 🔹 Find employee WhatsApp number
-    const empObj = employees.find(emp => emp.name === selectedEmp);
-    if (!empObj || !empObj.number) {
-      toast.warn("Employee WhatsApp number not found");
+    const emp = employees.find(e => e.name === selectedEmp);
+    if (!emp?.number) {
+      whatsappRef.current.close();
+      toast.warn("WhatsApp number not found");
       return;
     }
 
-    const whatsappNumber = empObj.number;
     const msg = encodeURIComponent(
       `Hi ${selectedEmp}, please complete your pending tasks:\n\n${taskList}`
     );
 
-    // 🔹 Open WhatsApp
-    window.open(`https://wa.me/${whatsappNumber}?text=${msg}`, "_blank");
+    // 🔥 REDIRECT SAME TAB
+    whatsappRef.current.location.replace(
+      `https://wa.me/${emp.number}?text=${msg}`
+    );
 
-    toast.success("Pending tasks sent to WhatsApp");
+    toast.info("WhatsApp opened. Please send the message");
 
   } catch (err) {
-    toast.error("Failed to send pending tasks");
-  } finally {
-    setLoadingDownload(false);
+    whatsappRef.current?.close();
+    toast.error("Something went wrong");
   }
 };
 
