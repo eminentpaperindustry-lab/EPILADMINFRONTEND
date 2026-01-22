@@ -218,7 +218,10 @@ export default function HelpTickets() {
                   >
                     <div>
                       <div className="font-semibold text-lg">
-                        {t.Issue}
+                       Ticket ID : {t.TicketID}
+                      </div>
+                      <div className="font-semibold text-lg">
+                       Problem : {t.Issue}
                       </div>
                       <div className="text-sm text-gray-600">
                         Created By: {t.CreatedBy}

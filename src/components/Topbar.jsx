@@ -6,6 +6,8 @@ import { FaUserCircle, FaChevronDown, FaSignOutAlt, FaBars } from "react-icons/f
 
 export default function Topbar() {
   const { user, logout } = useContext(AuthContext);
+  console.log("AuthContext:"  );
+  
 
   const [profileOpen, setProfileOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
@@ -156,6 +158,18 @@ export default function Topbar() {
             </span> */}
           </div>
 
+          {/* === ACTIVE STATUS === */}
+<div className="flex items-center gap-3 justify-end">
+  {/* Green Circle */}
+  <span className="w-3.5 h-3.5 rounded-full bg-green-500 animate-pulse" />
+
+  {/* Active Text */}
+  <span className="text-green-600 text-sm sm:text-base font-bold tracking-wide">
+    Active
+  </span>
+</div>
+
+
           {/* PROFILE BUTTON */}
           <button
             onClick={() => {
@@ -168,6 +182,7 @@ export default function Topbar() {
             <FaUserCircle className="w-6 h-6" />
             <span className="font-medium hidden sm:block">{user?.name}</span>
             <FaChevronDown className="w-3 h-3 opacity-70" />
+         
           </button>
         </div>
       </div>
@@ -243,7 +258,7 @@ export default function Topbar() {
               {user?.name}
             </p>
             <p className="text-xs mt-[2px]" style={{ color: theme.subtext }}>
-              {user?.email}
+              {user?.department}
             </p>
           </div>
 

@@ -551,7 +551,9 @@ export default function SupportTicket() {
                     className="bg-white p-4 rounded shadow mb-4 flex justify-between items-center"
                   >
                     <div>
-                      <div className="font-semibold">{t.Issue}</div>
+                      <div className="font-semibold">Ticket ID : {t.TicketID}</div>
+
+                      <div className="font-semibold">Problem : {t.Issue}</div>
                       <div className="text-sm">Created By: {t.CreatedBy}</div>
                       <div className="text-sm">Assigned To: {t.AssignedTo}</div>
                       <div className="text-sm text-gray-500">{date.fromNow()}</div>
@@ -649,7 +651,9 @@ export default function SupportTicket() {
                 className="bg-white p-4 rounded shadow mb-3 flex justify-between items-center"
               >
                 <div>
-                  <div className="font-medium">{t.Issue}</div>
+                     <div className="font-semibold">Ticket ID : {t.TicketID}</div>
+
+                      <div className="font-semibold">Problem : {t.Issue}</div>
                   <div className="text-sm text-gray-500">{dayjs(t.CreatedDate, DATE_FORMAT).fromNow()}</div>
                 </div>
 
