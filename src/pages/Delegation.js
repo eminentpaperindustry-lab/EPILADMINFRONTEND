@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState,useRef, useContext } from "react";
 import axios from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
 import { ToastContainer, toast } from "react-toastify";
@@ -26,6 +26,7 @@ const [assignBy, setAssignBy] = useState("");
 
   const [editTask, setEditTask] = useState(null);  // For editing task
   const [deleteTaskId, setDeleteTaskId] = useState(null); // For delete task confirmation
+  const whatsappRef = useRef(null);
 
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({
@@ -238,6 +239,68 @@ const sendPendingDelegationWhatsApp = async () => {
     toast.error("WhatsApp send failed ❌");
   }
 };
+
+
+const delegationFlowup = async () => {
+  try {
+    if (!selectedEmp) {
+      toast.warn("Select employee first");
+      return;
+    }
+
+    // 🔹 Pending tasks filter FIRST (no popup yet)
+    const pending = tasks.filter(
+      t =>
+        t.Deadline <= formatDateDDMMYYYYHHMMSS() &&
+        t.Status !== "Completed" &&
+        t.Name === selectedEmp
+    );
+
+    if (pending.length === 0) {
+      toast.info("No pending tasks");
+      return; // 🚫 NO WINDOW OPEN
+    }
+
+    const emp = employees.find(e => e.name === selectedEmp);
+    if (!emp?.number) {
+      toast.warn("Employee WhatsApp number missing");
+      return;
+    }
+
+    // 🔹 Beautiful numbered task list
+    const taskList = pending
+      .map((t, i) => `${i + 1}. ${t.TaskName}`)
+      .join("\n");
+
+    const message = encodeURIComponent(
+`Hi ${selectedEmp},
+
+Please complete your pending tasks:
+
+${taskList}
+
+Thanks`
+    );
+
+    // 🔥 OPEN WHATSAPP ONLY WHEN EVERYTHING IS READY
+    const whatsappWindow = window.open(
+      `https://wa.me/${emp.number}?text=${message}`,
+      "_blank"
+    );
+
+    if (!whatsappWindow) {
+      toast.error("Popup blocked. Allow popups for this site.");
+      return;
+    }
+
+    toast.success("WhatsApp opened successfully ✅");
+
+  } catch (error) {
+    console.error(error);
+    toast.error("WhatsApp send failed ❌");
+  }
+};
+
 
 
 
@@ -680,6 +743,10 @@ const updateTask = async () => {
 
        <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={downloadDelegationReport}>
             Download Report
+          </button>
+
+<button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={delegationFlowup}>
+            Pending Delegation Whatsapp Flowup
           </button>
 
            {/* <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={sendPendingDelegationWhatsApp}> */}
