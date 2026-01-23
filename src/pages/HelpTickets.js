@@ -326,36 +326,39 @@ export default function HelpTickets() {
               </div>
             )}
 
-            {createdTickets.map(t => {
-              const createdDate = dayjs(
-                t.CreatedDate,
-                "DD/MM/YYYY HH:mm:ss"
-              );
+          {createdTickets
+  .filter(t => !t.DoneDate) // jinke DoneDate null/empty hai sirf wahi aayenge
+  .map(t => {
+    const createdDate = dayjs(
+      t.CreatedDate,
+      "DD/MM/YYYY HH:mm:ss"
+    );
 
-              return (
-                <div
-                  key={t.TicketID}
-                  className="bg-white p-4 rounded shadow flex justify-between"
-                >
-                  <div>
-                    <div className="font-semibold">{t.Issue}</div>
-                    <div className="text-sm text-gray-600">
-                      {createdDate.fromNow()}
-                    </div>
-                  </div>
+    return (
+      <div
+        key={t.TicketID}
+        className="bg-white p-4 rounded shadow flex justify-between"
+      >
+        <div>
+          <div className="font-semibold">{t.Issue}</div>
+          <div className="text-sm text-gray-600">
+            {createdDate.fromNow()}
+          </div>
+        </div>
 
-                  <button
-                    disabled={markingDone === t.TicketID}
-                    onClick={() => markDone(t.TicketID)}
-                    className="bg-green-600 text-white px-3 py-1 rounded"
-                  >
-                    {markingDone === t.TicketID
-                      ? "Marking..."
-                      : "Mark Done"}
-                  </button>
-                </div>
-              );
-            })}
+        <button
+          disabled={markingDone === t.TicketID}
+          onClick={() => markDone(t.TicketID)}
+          className="bg-green-600 text-white px-3 py-1 rounded"
+        >
+          {markingDone === t.TicketID
+            ? "Marking..."
+            : "Mark Done"}
+        </button>
+      </div>
+    );
+  })}
+
           </div>
         </>
       )}

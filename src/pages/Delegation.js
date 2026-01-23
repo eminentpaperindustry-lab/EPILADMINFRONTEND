@@ -275,7 +275,8 @@ const delegationFlowup = async () => {
     const message = encodeURIComponent(
 `Hi ${selectedEmp},
 
-Please complete your pending tasks:
+👉 This is a gentle reminder regarding today’s pending & overdue tasks.
+Kindly complete the tasks/shift the dates accordingly. ⏳📅
 
 ${taskList}
 
