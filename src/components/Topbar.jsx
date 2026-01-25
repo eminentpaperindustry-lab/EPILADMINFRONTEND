@@ -288,6 +288,85 @@ export default function Topbar() {
           <button className="text-left text-white">Support</button>
         </div>
       )}
+
+{/* ===== DYNAMIC SCROLLING BANNER ===== */}
+{/* ===== DYNAMIC FAST SCROLLING BANNER ===== */}
+<div
+  className="w-full overflow-hidden border-t"
+  style={{
+    background: (() => {
+      const today = new Date();
+      return today.getMonth() === 0 && today.getDate() <= 26
+        ? "#f97316" // Orange for 26 Jan
+        : "#f1f5f9"; // Light background after 26 Jan
+    })(),
+    borderColor: theme.border,
+  }}
+>
+  <div
+    className="flex w-max whitespace-nowrap py-1 text-sm font-bold items-center"
+    style={{
+      color: (() => {
+        const today = new Date();
+        return today.getMonth() === 0 && today.getDate() <= 26
+          ? "#ffffff" // White on orange
+          : "#0f172a"; // Dark on light
+      })(),
+      animation: "scroll-left 10s linear infinite", // faster scroll
+      gap: "15px",
+    }}
+  >
+    {(() => {
+      const today = new Date();
+      if (today.getMonth() === 0 && today.getDate() <= 26) {
+        // 26 Jan message with Tiranga
+        const messages = [
+          " Happy Republic Day 2026",
+          "Celebrate Freedom & Unity! ",
+          "Jai Hind! ",
+        ];
+        // Duplicate content for seamless scroll
+        return [...messages, ...messages].map((msg, i) => (
+          <React.Fragment key={i}>
+            <span>{msg}</span>
+            <img
+              src="https://upload.wikimedia.org/wikipedia/en/4/41/Flag_of_India.svg"
+              alt="Tiranga"
+              style={{ width: "20px", height: "12px", display: "inline-block" }}
+            />
+          </React.Fragment>
+        ));
+      } else {
+        // Post 26 Jan system alert
+        const alertMsg =
+          "Refresh the portal before adding a task; if issues continue, log out/in or raise a support ticket.";
+        // Duplicate content for seamless scroll
+        return [alertMsg, alertMsg].map((msg, i) => <span key={i}>{msg}</span>);
+      }
+    })()}
+  </div>
+
+  <style>
+    {`
+      @keyframes scroll-left {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-50%); } /* Seamless scroll */
+      }
+    `}
+  </style>
+</div>
+
+
+      <style>
+        {`
+          @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+          }
+        `}
+      </style>
+
     </header>
   );
 }
