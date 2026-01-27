@@ -469,7 +469,7 @@ Thanks`
   
     } catch (err) {
       console.error(err);
-      toast.error("Failed to create task");
+      toast.error(err.response.data.error || "Failed to create task");
     } finally {
       setLoadingTaskId(null);
     }
