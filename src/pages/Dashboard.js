@@ -3,7 +3,7 @@ import axios from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
-
+import axiosLib from "axios"; // Standard library import karein
 export default function Dashboard() {
   const { user } = useContext(AuthContext);
 
@@ -12,7 +12,7 @@ export default function Dashboard() {
   const [selectedEmployee, setSelectedEmployee] = useState("all");
 
   const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true); // Data section loading
+  const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const [weekRange, setWeekRange] = useState({ start: "", end: "" });
@@ -33,7 +33,7 @@ export default function Dashboard() {
   // ================= ALL EMPLOYEES DASHBOARD =================
   const loadAllDashboard = async () => {
     try {
-      setLoading(true); // Start Loading
+      setLoading(true);
       const res = await axios.get("/allDashboard/all-dashboard", {
         params: {
           month: selectedMonth,
@@ -51,20 +51,193 @@ export default function Dashboard() {
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false); // Stop Loading
+      setLoading(false);
     }
   };
 
-  // ================= PDF DOWNLOAD LOGIC =================
+  // ================= WHATSAPP LOGIC =================
+// const sendBulkWhatsApp = async () => {
+//     if (allDashboardData.length === 0) return alert("No data to send!");
+    
+//     const confirmSend = window.confirm(`Send WhatsApp report to ${allDashboardData.length} employees?`);
+//     if (!confirmSend) return;
+
+//     setIsUpdating(true); 
+
+//     // 1. Token aur Phone ID (REACT_APP_ lagana zaroori hai .env me)
+//     // Testing ke liye yahan direct string daal kar check karein
+//     const PHONE_ID = process.env.REACT_APP_META_WA_PHONE_ID || "781492791715017";
+//     const TOKEN = process.env.REACT_APP_META_WA_TOKEN || "EAAcLV3bwZBZCMBPe2uYxqgVFZCZBx9EzrZAQz8u9EjvkC71lruMkVP32ilTiMeENDGNyyqQqzJfhf69EwFoMJhQ18Fe9JO3ZBj26YRNZCSh2FDcovrJuhZB3XtPRkjWQtFKeNrr9YAWZCSEzlRBZBSq2lCeZC2ZAEvKZAifGafEaUahZAnYNHEVpkGpghLIYRKj4AEIWxIzAZDZD";
+
+//     const isMonday = new Date().getDay() === 1;
+
+//     for (const emp of allDashboardData) {
+//         // Employee matching logic
+//         const empInfo = employees.find(e => e.name === emp.name || e.key === emp.name);
+//         let phone = empInfo?.number || empInfo?.mobile || empInfo?.phone;
+
+//         if (!phone) {
+//           console.warn(`❌ No phone for: ${emp.name}`);
+//           continue;
+//         }
+
+//         const cleanPhone = phone.toString().replace(/\D/g, "");
+//         const finalPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+
+//         // Score Calculation logic
+//         const woPendP = parseFloat(emp.overall?.pendingPercent || 0);
+//         const woDelayP = parseFloat(emp.overall?.delayPercent || 0);
+//         const woOverall = ((woPendP * 0.80) + (woDelayP * 0.20)).toFixed(2);
+        
+//         const delPendP = parseFloat(emp.delegation?.pendingPercent || 0);
+//         const delDelayP = parseFloat(emp.delegation?.delayPercent || 0);
+//         const delOverall = ((delPendP * 0.80) + (delDelayP * 0.20)).toFixed(2);
+
+//         const isHighScorer = parseFloat(woOverall) > 10 || parseFloat(delOverall) > 10;
+
+//         let var5 = ""; 
+//         let var6 = "";
+
+//         if (isMonday) {
+//             if (isHighScorer) {
+//               var5 = "⚠️ EM MEETING ALERT: Since your score is above 10%, you are required to attend the EM Meeting today.";
+//               var6 = "Please be prepared with the reasons for pending tasks.";
+//             } else {
+//               var5 = "🌟 EXCELLENT WORK: Your score is below 10%, so you are NOT required to attend today's EM Meeting.";
+//               var6 = "We are proud of your discipline! Keep up the great work. 🚀";
+//             }
+//         } else {
+//             var5 = "🚀 PERFORMANCE REMINDER: Please ensure all tasks are completed on time to maintain your score.";
+//             var6 = "Failure to improve may result in a mandatory invitation to the upcoming EM Meeting.";
+//         }
+
+//         const payload = {
+//             messaging_product: "whatsapp",
+//             to: finalPhone,
+//             type: "template",
+//            // Payload ke andar template section ko aise check karein
+// template: {
+//   name: "workreport", // 1. Check spelling exactly from Meta Dashboard
+//   language: { 
+//     code: "en" // 2. Agar "en_US" nahi chal raha, toh sirf "en" try karein
+//   },
+//   components: [
+//     {
+//       type: "body",
+//       parameters: [
+//         { type: "text", text: String(emp.name) },
+//         { type: "text", text: `${weekRange.start} to ${weekRange.end}` },
+//         { type: "text", text: String(delOverall) },
+//         { type: "text", text: String(woOverall) },
+//         { type: "text", text: String(var5) },
+//         { type: "text", text: String(var6) }
+//       ]
+//     }
+//   ]
+// }
+//         };
+
+//         try {
+//             // Hum yahan headers ko ekdum clean bhej rahe hain
+//             const response = await axiosLib({
+//                 method: 'post',
+//                 url: `https://graph.facebook.com/v21.0/${PHONE_ID}/messages`,
+//                 data: payload,
+//                 headers: { 
+//                     'Authorization': `Bearer ${TOKEN.trim()}`, // trim() space hata dega
+//                     'Content-Type': 'application/json'
+//                 }
+//             });
+//             console.log(`✅ Success for ${emp.name}:`, response.data);
+//         } catch (err) {
+//             console.error(`❌ Meta API Error for ${emp.name}:`, err.response?.data || err.message);
+//         }
+//     }
+
+//     setIsUpdating(false);
+//     alert("Process completed!");
+// };
+
+
+const sendBulkWhatsApp = async () => {
+    if (allDashboardData.length === 0) return alert("No data to send!");
+    
+    const confirmSend = window.confirm(`Send WhatsApp report to ${allDashboardData.length} employees?`);
+    if (!confirmSend) return;
+
+    setIsUpdating(true); 
+    const PHONE_ID = process.env.REACT_APP_META_WA_PHONE_ID
+    const TOKEN = process.env.REACT_APP_META_WA_TOKEN;
+    const isMonday = new Date().getDay() === 1;
+
+    // Helper function for delay
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    for (let i = 0; i < allDashboardData.length; i++) {
+        const emp = allDashboardData[i];
+        const empInfo = employees.find(e => e.name === emp.name || e.key === emp.name);
+        let phone = empInfo?.number || empInfo?.mobile || empInfo?.phone;
+
+        if (!phone) continue;
+
+        const cleanPhone = phone.toString().replace(/\D/g, "");
+        const finalPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+
+        // Score logic (same as before)
+        const woPendP = parseFloat(emp.overall?.pendingPercent || 0);
+        const woDelayP = parseFloat(emp.overall?.delayPercent || 0);
+        const woOverall = ((woPendP * 0.80) + (woDelayP * 0.20)).toFixed(2);
+        const delOverall = ((parseFloat(emp.delegation?.pendingPercent || 0) * 0.80) + (parseFloat(emp.delegation?.delayPercent || 0) * 0.20)).toFixed(2);
+        const isHighScorer = parseFloat(woOverall) > 10 || parseFloat(delOverall) > 10;
+
+        let var5 = isMonday ? (isHighScorer ? "⚠️ EM MEETING ALERT: Score > 10%, attend meeting." : "🌟 EXCELLENT: Score < 10%, no meeting.") : "🚀 PERFORMANCE REMINDER: Keep it up!";
+        let var6 = isMonday ? (isHighScorer ? "Prepared with reasons." : "Proud of you!") : "Maintain your score.";
+
+        const payload = {
+            messaging_product: "workreporttemplaterfg", //wrong
+            to: finalPhone,
+            type: "template",
+            template: {
+                name: "workreport",
+                language: { code: "en" },
+                components: [{
+                    type: "body",
+                    parameters: [
+                        { type: "text", text: String(emp.name) },
+                        { type: "text", text: `${weekRange.start} to ${weekRange.end}` },
+                        { type: "text", text: String(delOverall) },
+                        { type: "text", text: String(woOverall) },
+                        { type: "text", text: String(var5) },
+                        { type: "text", text: String(var6) }
+                    ]
+                }]
+            }
+        };
+
+        try {
+            await axiosLib.post(`https://graph.facebook.com/v21.0/${PHONE_ID}/messages`, payload, {
+                headers: { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }
+            });
+            console.log(`✅ ${i+1}/${allDashboardData.length} Sent to ${emp.name}`);
+            
+            // 🔥 HAR MESSAGE KE BAAD 2 SECOND KA WAIT
+            await delay(2000); 
+
+        } catch (err) {
+            console.error(`❌ Error for ${emp.name}:`, err.response?.data || err.message);
+        }
+    }
+
+    setIsUpdating(false);
+    alert("Bulk Process completed! Check your Meta Dashboard after 5 mins for final delivery status.");
+};
+  // ================= PDF DOWNLOAD LOGIC (No changes) =================
   const downloadPDF = (filterType = "all") => {
-    // Check if data exists
     if (allDashboardData.length === 0) {
       alert("Please wait, data is still loading or not available!");
       return;
     }
-
     const doc = new jsPDF("landscape", "mm", "a4");
-
     doc.setFillColor(255, 235, 156); 
     doc.rect(10, 10, 277, 8, "F");
     doc.setFontSize(10);
@@ -149,7 +322,6 @@ export default function Dashboard() {
 
   return (
     <div className="h-screen flex flex-col bg-slate-100 font-sans">
-      {/* Header Always Stable */}
       <header className="sticky top-0 z-40 bg-slate-800 text-white px-4 py-3 md:px-6 shadow-md">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex flex-col">
@@ -203,16 +375,24 @@ export default function Dashboard() {
                 <button 
                   onClick={() => downloadPDF("all")}
                   disabled={loading}
-                  className={`flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg transition-all active:scale-95 ${loading ? 'bg-slate-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                  className={`flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg transition-all active:scale-95 ${loading ? 'bg-slate-600' : 'bg-blue-600 hover:bg-blue-700'}`}
                 >
                   ALL REPORT
                 </button>
                 <button 
                   onClick={() => downloadPDF("em")}
                   disabled={loading}
-                  className={`flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg transition-all active:scale-95 ${loading ? 'bg-slate-600 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700'}`}
+                  className={`flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg transition-all active:scale-95 ${loading ? 'bg-slate-600' : 'bg-rose-600 hover:bg-rose-700'}`}
                 >
                   EM REPORT
+                </button>
+                {/* WHATSAPP BUTTON ADDED HERE */}
+                <button 
+                  onClick={sendBulkWhatsApp}
+                  disabled={loading || isUpdating}
+                  className={`flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg transition-all active:scale-95 ${loading || isUpdating ? 'bg-slate-600' : 'bg-green-600 hover:bg-green-700'}`}
+                >
+                  {isUpdating ? "SENDING..." : "WHATSAPP REPORT"}
                 </button>
               </div>
             )}
@@ -220,19 +400,20 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main Content Area - Loading happens here */}
       <main className="flex-1 overflow-y-auto p-4 md:p-6 relative">
-        {loading ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100/80 backdrop-blur-sm z-10">
+        {(loading || isUpdating) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100/80 backdrop-blur-sm z-50">
             <div className="relative">
                <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-600 font-bold text-[10px]">DATA</div>
+               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-600 font-bold text-[10px]">{isUpdating ? "WA" : "DATA"}</div>
             </div>
             <p className="mt-4 text-slate-600 font-black text-xs animate-pulse uppercase tracking-widest">
-              Fetching Dashboard Data...
+              {isUpdating ? "Sending WhatsApp Messages..." : "Fetching Dashboard Data..."}
             </p>
           </div>
-        ) : (
+        )}
+
+        {!loading && (
           <div className="animate-fadeIn">
             {selectedEmployee === "all" && (
               <div className="space-y-6">
@@ -289,6 +470,7 @@ export default function Dashboard() {
   );
 }
 
+// ... THEMES, Card, and SingleSection components remain exactly same ...
 const THEMES = {
   blue: "bg-blue-600 text-white",
   amber: "bg-amber-500 text-white",
