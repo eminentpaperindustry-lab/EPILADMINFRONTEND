@@ -3,7 +3,8 @@ import axios from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
-import axiosLib from "axios"; // Standard library import karein
+import axiosLib from "axios";
+
 export default function Dashboard() {
   const { user } = useContext(AuthContext);
 
@@ -55,111 +56,66 @@ export default function Dashboard() {
     }
   };
 
-  // ================= WHATSAPP LOGIC =================
-// const sendBulkWhatsApp = async () => {
-//     if (allDashboardData.length === 0) return alert("No data to send!");
+  // ================= CALCULATE WITHOUT DELEGATION DATA =================
+  const calculateWithoutDelegation = (emp) => {
+    // Combine checklist, helpTicket, and supportTicket
+    const checklist = emp.checklist || {};
+    const helpAssigned = emp.helpTicket?.assigned || {};
+    const supportAssigned = emp.supportTicket?.assigned || {};
+
+    const totalWork = (checklist.totalWork || 0) + 
+                     (helpAssigned.totalWork || 0) + 
+                     (supportAssigned.totalWork || 0);
     
-//     const confirmSend = window.confirm(`Send WhatsApp report to ${allDashboardData.length} employees?`);
-//     if (!confirmSend) return;
+    const completedWork = (checklist.completedWork || 0) + 
+                         (helpAssigned.completedWork || 0) + 
+                         (supportAssigned.completedWork || 0);
+    
+    const pendingWork = (checklist.pendingWork || 0) + 
+                       (helpAssigned.pendingWork || 0) + 
+                       (supportAssigned.pendingWork || 0);
+    
+    const onTimeWork = (checklist.onTimeWork || 0) + 
+                      (helpAssigned.onTimeWork || 0) + 
+                      (supportAssigned.onTimeWork || 0);
 
-//     setIsUpdating(true); 
+    // Calculate percentages with minus sign
+    const pendingPercent = totalWork > 0 ? ((pendingWork / totalWork) * 100).toFixed(2) : "0.00";
+    const delayPercent = totalWork > 0 ? (((totalWork - onTimeWork) / totalWork) * 100).toFixed(2) : "0.00";
+    
+    // Calculate overall score with minus sign
+    const overallScore = ((parseFloat(pendingPercent) * 0.80) + (parseFloat(delayPercent) * 0.20)).toFixed(2);
 
-//     // 1. Token aur Phone ID (REACT_APP_ lagana zaroori hai .env me)
-//     // Testing ke liye yahan direct string daal kar check karein
-//     const PHONE_ID = process.env.REACT_APP_META_WA_PHONE_ID || "781492791715017";
-//     const TOKEN = process.env.REACT_APP_META_WA_TOKEN || "EAAcLV3bwZBZCMBPe2uYxqgVFZCZBx9EzrZAQz8u9EjvkC71lruMkVP32ilTiMeENDGNyyqQqzJfhf69EwFoMJhQ18Fe9JO3ZBj26YRNZCSh2FDcovrJuhZB3XtPRkjWQtFKeNrr9YAWZCSEzlRBZBSq2lCeZC2ZAEvKZAifGafEaUahZAnYNHEVpkGpghLIYRKj4AEIWxIzAZDZD";
+    return {
+      totalWork,
+      completedWork,
+      pendingWork,
+      onTimeWork,
+      pendingPercent: `-${pendingPercent}`,
+      delayPercent: `-${delayPercent}`,
+      overallScore: `-${overallScore}`
+    };
+  };
 
-//     const isMonday = new Date().getDay() === 1;
+  // ================= FORMAT PERCENTAGES WITH MINUS SIGN =================
+  const formatPercent = (value) => {
+    if (!value) return "-0.00%";
+    const num = parseFloat(value);
+    if (isNaN(num)) return "-0.00%";
+    return `-${num.toFixed(2)}%`;
+  };
 
-//     for (const emp of allDashboardData) {
-//         // Employee matching logic
-//         const empInfo = employees.find(e => e.name === emp.name || e.key === emp.name);
-//         let phone = empInfo?.number || empInfo?.mobile || empInfo?.phone;
+  // ================= CALCULATE DELEGATION OVERALL SCORE =================
+  const calculateDelegationOverall = (delegation) => {
+    const del = delegation || {};
+    const pendingPercent = parseFloat(del.pendingPercent || 0);
+    const delayPercent = parseFloat(del.delayPercent || 0);
+    const score = ((pendingPercent * 0.80) + (delayPercent * 0.20)).toFixed(2);
+    return `-${score}`;
+  };
 
-//         if (!phone) {
-//           console.warn(`❌ No phone for: ${emp.name}`);
-//           continue;
-//         }
-
-//         const cleanPhone = phone.toString().replace(/\D/g, "");
-//         const finalPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-
-//         // Score Calculation logic
-//         const woPendP = parseFloat(emp.overall?.pendingPercent || 0);
-//         const woDelayP = parseFloat(emp.overall?.delayPercent || 0);
-//         const woOverall = ((woPendP * 0.80) + (woDelayP * 0.20)).toFixed(2);
-        
-//         const delPendP = parseFloat(emp.delegation?.pendingPercent || 0);
-//         const delDelayP = parseFloat(emp.delegation?.delayPercent || 0);
-//         const delOverall = ((delPendP * 0.80) + (delDelayP * 0.20)).toFixed(2);
-
-//         const isHighScorer = parseFloat(woOverall) > 10 || parseFloat(delOverall) > 10;
-
-//         let var5 = ""; 
-//         let var6 = "";
-
-//         if (isMonday) {
-//             if (isHighScorer) {
-//               var5 = "⚠️ EM MEETING ALERT: Since your score is above 10%, you are required to attend the EM Meeting today.";
-//               var6 = "Please be prepared with the reasons for pending tasks.";
-//             } else {
-//               var5 = "🌟 EXCELLENT WORK: Your score is below 10%, so you are NOT required to attend today's EM Meeting.";
-//               var6 = "We are proud of your discipline! Keep up the great work. 🚀";
-//             }
-//         } else {
-//             var5 = "🚀 PERFORMANCE REMINDER: Please ensure all tasks are completed on time to maintain your score.";
-//             var6 = "Failure to improve may result in a mandatory invitation to the upcoming EM Meeting.";
-//         }
-
-//         const payload = {
-//             messaging_product: "whatsapp",
-//             to: finalPhone,
-//             type: "template",
-//            // Payload ke andar template section ko aise check karein
-// template: {
-//   name: "workreport", // 1. Check spelling exactly from Meta Dashboard
-//   language: { 
-//     code: "en" // 2. Agar "en_US" nahi chal raha, toh sirf "en" try karein
-//   },
-//   components: [
-//     {
-//       type: "body",
-//       parameters: [
-//         { type: "text", text: String(emp.name) },
-//         { type: "text", text: `${weekRange.start} to ${weekRange.end}` },
-//         { type: "text", text: String(delOverall) },
-//         { type: "text", text: String(woOverall) },
-//         { type: "text", text: String(var5) },
-//         { type: "text", text: String(var6) }
-//       ]
-//     }
-//   ]
-// }
-//         };
-
-//         try {
-//             // Hum yahan headers ko ekdum clean bhej rahe hain
-//             const response = await axiosLib({
-//                 method: 'post',
-//                 url: `https://graph.facebook.com/v21.0/${PHONE_ID}/messages`,
-//                 data: payload,
-//                 headers: { 
-//                     'Authorization': `Bearer ${TOKEN.trim()}`, // trim() space hata dega
-//                     'Content-Type': 'application/json'
-//                 }
-//             });
-//             console.log(`✅ Success for ${emp.name}:`, response.data);
-//         } catch (err) {
-//             console.error(`❌ Meta API Error for ${emp.name}:`, err.response?.data || err.message);
-//         }
-//     }
-
-//     setIsUpdating(false);
-//     alert("Process completed!");
-// };
-
-
-const sendBulkWhatsApp = async () => {
+  // ================= WHATSAPP LOGIC =================
+  const sendBulkWhatsApp = async () => {
     if (allDashboardData.length === 0) return alert("No data to send!");
     
     const confirmSend = window.confirm(`Send WhatsApp report to ${allDashboardData.length} employees?`);
@@ -170,73 +126,72 @@ const sendBulkWhatsApp = async () => {
     const TOKEN = process.env.REACT_APP_META_WA_TOKEN;
     const isMonday = new Date().getDay() === 1;
 
-    // Helper function for delay
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
     for (let i = 0; i < allDashboardData.length; i++) {
-        const emp = allDashboardData[i];
-        const empInfo = employees.find(e => e.name === emp.name || e.key === emp.name);
-        let phone = empInfo?.number || empInfo?.mobile || empInfo?.phone;
+      const emp = allDashboardData[i];
+      const empInfo = employees.find(e => e.name === emp.name || e.key === emp.name);
+      let phone = empInfo?.number || empInfo?.mobile || empInfo?.phone;
 
-        if (!phone) continue;
+      if (!phone) continue;
 
-        const cleanPhone = phone.toString().replace(/\D/g, "");
-        const finalPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+      const cleanPhone = phone.toString().replace(/\D/g, "");
+      const finalPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
 
-        // Score logic (same as before)
-        const woPendP = parseFloat(emp.overall?.pendingPercent || 0);
-        const woDelayP = parseFloat(emp.overall?.delayPercent || 0);
-        const woOverall = ((woPendP * 0.80) + (woDelayP * 0.20)).toFixed(2);
-        const delOverall = ((parseFloat(emp.delegation?.pendingPercent || 0) * 0.80) + (parseFloat(emp.delegation?.delayPercent || 0) * 0.20)).toFixed(2);
-        const isHighScorer = parseFloat(woOverall) > 10 || parseFloat(delOverall) > 10;
+      // Calculate scores
+      const withoutDelData = calculateWithoutDelegation(emp);
+      const woOverall = withoutDelData.overallScore.replace("-", ""); // Remove minus for WhatsApp
+      
+      const delOverall = calculateDelegationOverall(emp.delegation).replace("-", ""); // Remove minus
+      
+      const isHighScorer = parseFloat(woOverall) > 10 || parseFloat(delOverall) > 10;
 
-        let var5 = isMonday ? (isHighScorer ? "⚠️ EM MEETING ALERT: Score > 10%, attend meeting." : "🌟 EXCELLENT: Score < 10%, no meeting.") : "🚀 PERFORMANCE REMINDER: Keep it up!";
-        let var6 = isMonday ? (isHighScorer ? "Prepared with reasons." : "Proud of you!") : "Maintain your score.";
+      let var5 = isMonday ? (isHighScorer ? "⚠️ EM MEETING ALERT: Score > 10%, attend meeting." : "🌟 EXCELLENT: Score < 10%, no meeting.") : "🚀 PERFORMANCE REMINDER: Keep it up!";
+      let var6 = isMonday ? (isHighScorer ? "Prepared with reasons." : "Proud of you!") : "Maintain your score.";
 
-        const payload = {
-            messaging_product: "workreporttemplaterfg", //wrong
-            to: finalPhone,
-            type: "template",
-            template: {
-                name: "workreport",
-                language: { code: "en" },
-                components: [{
-                    type: "body",
-                    parameters: [
-                        { type: "text", text: String(emp.name) },
-                        { type: "text", text: `${weekRange.start} to ${weekRange.end}` },
-                        { type: "text", text: String(delOverall) },
-                        { type: "text", text: String(woOverall) },
-                        { type: "text", text: String(var5) },
-                        { type: "text", text: String(var6) }
-                    ]
-                }]
-            }
-        };
-
-        try {
-            await axiosLib.post(`https://graph.facebook.com/v21.0/${PHONE_ID}/messages`, payload, {
-                headers: { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }
-            });
-            console.log(`✅ ${i+1}/${allDashboardData.length} Sent to ${emp.name}`);
-            
-            // 🔥 HAR MESSAGE KE BAAD 2 SECOND KA WAIT
-            await delay(2000); 
-
-        } catch (err) {
-            console.error(`❌ Error for ${emp.name}:`, err.response?.data || err.message);
+      const payload = {
+        messaging_product: "whatsapp",
+        to: finalPhone,
+        type: "template",
+        template: {
+          name: "workreport",
+          language: { code: "en" },
+          components: [{
+            type: "body",
+            parameters: [
+              { type: "text", text: String(emp.name) },
+              { type: "text", text: `${weekRange.start} to ${weekRange.end}` },
+              { type: "text", text: String(delOverall) },
+              { type: "text", text: String(woOverall) },
+              { type: "text", text: String(var5) },
+              { type: "text", text: String(var6) }
+            ]
+          }]
         }
+      };
+
+      try {
+        await axiosLib.post(`https://graph.facebook.com/v21.0/${PHONE_ID}/messages`, payload, {
+          headers: { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }
+        });
+        console.log(`✅ ${i+1}/${allDashboardData.length} Sent to ${emp.name}`);
+        await delay(2000);
+      } catch (err) {
+        console.error(`❌ Error for ${emp.name}:`, err.response?.data || err.message);
+      }
     }
 
     setIsUpdating(false);
-    alert("Bulk Process completed! Check your Meta Dashboard after 5 mins for final delivery status.");
-};
-  // ================= PDF DOWNLOAD LOGIC (No changes) =================
+    alert("Bulk Process completed!");
+  };
+
+  // ================= PDF DOWNLOAD LOGIC =================
   const downloadPDF = (filterType = "all") => {
     if (allDashboardData.length === 0) {
       alert("Please wait, data is still loading or not available!");
       return;
     }
+    
     const doc = new jsPDF("landscape", "mm", "a4");
     doc.setFillColor(255, 235, 156); 
     doc.rect(10, 10, 277, 8, "F");
@@ -249,53 +204,75 @@ const sendBulkWhatsApp = async () => {
       [
         { content: "DOER NO.", rowSpan: 2 },
         { content: "DOER NAME", rowSpan: 2 },
-        { content: "WITH OUT DELIGATION", colSpan: 7 }, 
-        { content: "ONLY DELIGATION", colSpan: 9 }, 
+        { content: "WITHOUT DELEGATION", colSpan: 7 },
+        { content: "DELEGATION", colSpan: 7 },
+        { content: "OVERALL", colSpan: 7 },
         { content: "EM DOER", rowSpan: 2 }
       ],
       [
-        "TOTAL", "COMPLETED", "ON TIME", "PENDING", "PEND %", "DELAY %", "OVERALL SCORE",
-        "TOTAL", "COMPLETED", "ON TIME", "PENDING", "PEND %", "DELAY %", "OVERALL SCORE", "EM REPETITION", "NEXT TARGET",
-        "YES/NO"
+        // Without Delegation
+        "TOTAL", "COMPLETED", "ON TIME", "PENDING", "PEND %", "DELAY %", "SCORE",
+        // Delegation
+        "TOTAL", "COMPLETED", "ON TIME", "PENDING", "PEND %", "DELAY %", "SCORE",
+        // Overall
+        "TOTAL", "COMPLETED", "ON TIME", "PENDING", "PEND %", "DELAY %", "SCORE",
+        // EM Doer
+        ""
       ]
     ];
 
     const body = allDashboardData
-      .map((emp) => {
-        const woTotal = (emp.checklist?.totalWork || 0) + (emp.helpTicket?.assigned?.totalWork || 0) + (emp.supportTicket?.assigned?.totalWork || 0);
-        const woOnTime = (emp.checklist?.onTimeWork || 0) + (emp.helpTicket?.assigned?.onTimeWork || 0) + (emp.supportTicket?.assigned?.onTimeWork || 0);
-        const woPending = (emp.checklist?.pendingWork || 0) + (emp.helpTicket?.assigned?.pendingWork || 0) + (emp.supportTicket?.assigned?.pendingWork || 0);
-        const woCompleted = (emp.checklist?.completedWork || 0) + (emp.helpTicket?.assigned?.completedWork || 0) + (emp.supportTicket?.assigned?.completedWork || 0);
+      .map((emp, idx) => {
+        // Without Delegation data
+        const withoutDelData = calculateWithoutDelegation(emp);
         
-        const woPendP = woTotal > 0 ? (woPending / woTotal) * 100 : 0;
-        const woDelayP = woTotal > 0 ? ((woTotal - woOnTime) / woTotal) * 100 : 0;
-        const woOverall = ((woPendP * 0.80) + (woDelayP * 0.20)).toFixed(2);
-
-        const delTotal = emp.delegation?.totalWork || 0;
-        const delOnTime = emp.delegation?.onTimeWork || 0;
-        const delPending = emp.delegation?.pendingWork || 0;
-        const delCompleted = emp.delegation?.completedWork || 0;
+        // Delegation data
+        const del = emp.delegation || {};
+        const delOverall = calculateDelegationOverall(emp.delegation);
         
-        const delPendP = delTotal > 0 ? (delPending / delTotal) * 100 : 0;
-        const delDelayP = delTotal > 0 ? ((delTotal - delOnTime) / delTotal) * 100 : 0;
-        const delOverall = ((delPendP * 0.80) + (delDelayP * 0.20)).toFixed(2);
+        // Overall data from API
+        const overall = emp.overall || {};
+        
+        // EM Doer calculation
+        const woOverallNum = parseFloat(withoutDelData.overallScore.replace("-", "") || 0);
+        const delOverallNum = parseFloat(delOverall.replace("-", "") || 0);
+        const isEMDoer = (woOverallNum > 10 || delOverallNum > 10) ? "YES" : "NO";
 
-        const isEMDoer = (parseFloat(woOverall) > 10 || parseFloat(delOverall) > 10) ? "YES" : "NO";
-
-        return {
-          row: [
-            0, emp.name,
-            woTotal, woCompleted, woOnTime, woPending, `${woPendP.toFixed(2)}%`, `${woDelayP.toFixed(2)}%`, woOverall,
-            delTotal, delCompleted, delOnTime, delPending, `${delPendP.toFixed(2)}%`, `${delDelayP.toFixed(2)}%`, delOverall, 
-            "", "", isEMDoer
-          ],
-          isEMDoer: isEMDoer
-        };
+        return [
+          idx + 1, 
+          emp.name,
+          // Without Delegation columns
+          withoutDelData.totalWork,
+          withoutDelData.completedWork,
+          withoutDelData.onTimeWork,
+          withoutDelData.pendingWork,
+          withoutDelData.pendingPercent + "%",
+          withoutDelData.delayPercent + "%",
+          withoutDelData.overallScore,
+          // Delegation columns
+          del.totalWork || 0,
+          del.completedWork || 0,
+          del.onTimeWork || 0,
+          del.pendingWork || 0,
+          formatPercent(del.pendingPercent),
+          formatPercent(del.delayPercent),
+          delOverall,
+          // Overall columns
+          overall.totalWork || 0,
+          overall.totalCompleted || 0,
+          overall.totalOnTime || 0,
+          overall.totalPending || 0,
+          formatPercent(overall.pendingPercent),
+          formatPercent(overall.delayPercent),
+          formatPercent(overall.overallScore),
+          // EM Doer
+          isEMDoer
+        ];
       })
-      .filter(item => filterType === "em" ? item.isEMDoer === "YES" : true)
-      .map((item, idx) => {
-        item.row[0] = idx + 1;
-        return item.row;
+      .filter((row, idx) => {
+        if (filterType !== "em") return true;
+        const isEMDoer = row[row.length - 1] === "YES";
+        return isEMDoer;
       });
 
     doc.autoTable({
@@ -305,7 +282,13 @@ const sendBulkWhatsApp = async () => {
       theme: 'grid',
       styles: { fontSize: 5, halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0] },
       headStyles: { fillColor: [198, 224, 180], textColor: [0, 0, 0], fontStyle: 'bold' },
-      columnStyles: { 1: { cellWidth: 22 }, 14: { cellWidth: 12 }, 15: { cellWidth: 12 } }
+      columnStyles: { 
+        1: { cellWidth: 20 }, // Name column
+        7: { cellWidth: 8 }, // Without Delegation Score
+        14: { cellWidth: 8 }, // Delegation Score
+        21: { cellWidth: 8 }, // Overall Score
+        22: { cellWidth: 8 }  // EM Doer
+      }
     });
 
     doc.save(`${filterType === "em" ? "EM_Report" : "Full_Report"}_W${selectedWeek}.pdf`);
@@ -319,6 +302,130 @@ const sendBulkWhatsApp = async () => {
   useEffect(() => {
     loadAllDashboard();
   }, [selectedEmployee, selectedMonth, selectedWeek]);
+
+  // ================= RENDER SECTION FOR ALL EMPLOYEES =================
+  const renderAllEmployeesView = () => {
+    return (
+      <div className="space-y-6">
+        {allDashboardData.map((emp, idx) => {
+          const withoutDelData = calculateWithoutDelegation(emp);
+          const delOverall = calculateDelegationOverall(emp.delegation);
+          const overallData = emp.overall || {};
+          
+          // Remove minus signs for calculation
+          const woOverallNum = parseFloat(withoutDelData.overallScore.replace("-", "") || 0);
+          const delOverallNum = parseFloat(delOverall.replace("-", "") || 0);
+          const combinedOverall = ((woOverallNum + delOverallNum) / 2).toFixed(2);
+          
+          return (
+            <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl hover:border-blue-300 transition-all duration-300 group">
+              {/* Employee Header */}
+              <div className="px-6 py-4 border-b bg-gradient-to-r from-slate-50 to-blue-50 group-hover:from-blue-50 group-hover:to-indigo-50 transition-colors">
+                <div className="flex justify-between items-center">
+                  <h2 className="font-black uppercase text-lg text-slate-700 group-hover:text-blue-700">
+                    {emp.name}
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-100 text-blue-700">
+                      Employee #{idx + 1}
+                    </span>
+                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${parseFloat(combinedOverall) > 10 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {parseFloat(combinedOverall) > 10 ? '⚠️ EM Required' : '✅ Good'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Three Sections Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 cursor-default">
+                {/* Delegation Section */}
+                <div className="border border-slate-200 rounded-xl p-5 bg-gradient-to-br from-slate-50 to-white hover:shadow-md transition-all duration-300 hover:border-blue-300">
+                  <h3 className="font-black text-sm uppercase text-center mb-4 text-slate-600 border-b pb-3">
+                    Delegation
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <MiniCard title="Total Work" value={emp.delegation?.totalWork || 0} theme="slate" />
+                    <MiniCard title="Completed" value={emp.delegation?.completedWork || 0} theme="emerald" />
+                    <MiniCard title="On Time" value={emp.delegation?.onTimeWork || 0} theme="emerald" />
+                    <MiniCard title="Pending" value={emp.delegation?.pendingWork || 0} theme="amber" />
+                    <MiniCard title="Pending %" value={formatPercent(emp.delegation?.pendingPercent)} theme="indigo" />
+                    <MiniCard title="Delay %" value={formatPercent(emp.delegation?.delayPercent)} theme="rose" />
+                  </div>
+                  <div className="mt-5 pt-4 border-t border-slate-200">
+                    <div className="text-center">
+                      <span className="text-xs font-bold text-slate-500">Delegation Score</span>
+                      <p className="text-xl font-black text-blue-600">{delOverall}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Without Delegation Section */}
+                <div className="border border-slate-200 rounded-xl p-5 bg-gradient-to-br from-blue-50 to-white hover:shadow-md transition-all duration-300 hover:border-blue-300">
+                  <h3 className="font-black text-sm uppercase text-center mb-4 text-blue-600 border-b pb-3">
+                    Without Delegation
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <MiniCard title="Total Work" value={withoutDelData.totalWork} theme="slate" />
+                    <MiniCard title="Completed" value={withoutDelData.completedWork} theme="emerald" />
+                    <MiniCard title="On Time" value={withoutDelData.onTimeWork} theme="emerald" />
+                    <MiniCard title="Pending" value={withoutDelData.pendingWork} theme="amber" />
+                    <MiniCard title="Pending %" value={withoutDelData.pendingPercent + "%"} theme="indigo" />
+                    <MiniCard title="Delay %" value={withoutDelData.delayPercent + "%"} theme="rose" />
+                  </div>
+                  <div className="mt-5 pt-4 border-t border-slate-200">
+                    <div className="text-center">
+                      <span className="text-xs font-bold text-slate-500">Without Delegation Score</span>
+                      <p className="text-xl font-black text-blue-600">{withoutDelData.overallScore}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overall Section (from API) */}
+                <div className="border border-slate-200 rounded-xl p-5 bg-gradient-to-br from-emerald-50 to-white hover:shadow-md transition-all duration-300 hover:border-emerald-300">
+                  <h3 className="font-black text-sm uppercase text-center mb-4 text-emerald-600 border-b pb-3">
+                    Overall 
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <MiniCard title="Total Work" value={overallData.totalWork || 0} theme="slate" />
+                    <MiniCard title="Completed" value={overallData.totalCompleted || 0} theme="emerald" />
+                    <MiniCard title="On Time" value={overallData.totalOnTime || 0} theme="emerald" />
+                    <MiniCard title="Pending" value={overallData.totalPending || 0} theme="amber" />
+                    <MiniCard title="Pending %" value={formatPercent(overallData.pendingPercent)} theme="indigo" />
+                    <MiniCard title="Delay %" value={formatPercent(overallData.delayPercent)} theme="rose" />
+                  </div>
+                  <div className="mt-5 pt-4 border-t border-slate-200">
+                    <div className="text-center">
+                      <span className="text-xs font-bold text-slate-500">Overall Score</span>
+                      <p className="text-xl font-black text-emerald-600">{formatPercent(overallData.overallScore)}</p>
+                    </div>
+              
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // ================= RENDER SECTION FOR SINGLE EMPLOYEE =================
+  const renderSingleEmployeeView = () => {
+    if (allDashboardData.length === 0) return null;
+    const emp = allDashboardData[0];
+    
+    return (
+      <div className="space-y-6 animate-fadeIn">
+        <SingleSection title="Delegation" data={emp?.delegation} showScore={true} formatPercent={formatPercent} />
+        <SingleSection title="Checklist" data={emp?.checklist} formatPercent={formatPercent} />
+        <SingleSection title="Help Tickets Assigned" data={emp?.helpTicket?.assigned} formatPercent={formatPercent} />
+        <SingleSection title="Help Tickets Created" data={emp?.helpTicket?.created} formatPercent={formatPercent} />
+        <SingleSection title="Support Tickets Assigned" data={emp?.supportTicket?.assigned} formatPercent={formatPercent} />
+        <SingleSection title="Support Tickets Created" data={emp?.supportTicket?.created} formatPercent={formatPercent} />
+        <SingleSection title="Overall" data={emp?.overall} showScore={true} formatPercent={formatPercent} />
+      </div>
+    );
+  };
 
   return (
     <div className="h-screen flex flex-col bg-slate-100 font-sans">
@@ -386,7 +493,6 @@ const sendBulkWhatsApp = async () => {
                 >
                   EM REPORT
                 </button>
-                {/* WHATSAPP BUTTON ADDED HERE */}
                 <button 
                   onClick={sendBulkWhatsApp}
                   disabled={loading || isUpdating}
@@ -415,43 +521,15 @@ const sendBulkWhatsApp = async () => {
 
         {!loading && (
           <div className="animate-fadeIn">
-            {selectedEmployee === "all" && (
-              <div className="space-y-6">
-                {allDashboardData.map((emp, idx) => (
-                  <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl hover:border-blue-300 transition-all duration-300 group">
-                    <div className="px-6 py-3 border-b bg-slate-50 flex justify-between group-hover:bg-blue-50 transition-colors">
-                      <h2 className="font-black uppercase text-slate-700 group-hover:text-blue-700">{emp.name}</h2>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 p-6 cursor-default">
-                      <Card title="Total Work" value={emp.overall.totalWork} theme="slate" />
-                      <Card title="Completed" value={emp.overall.totalCompleted} theme="emerald" />
-                      <Card title="On Time" value={emp.overall.totalOnTime} theme="emerald" />
-                      <Card title="Pending" value={emp.overall.totalPending} theme="amber" />
-                      <Card title="Pending %" value={`${emp.overall.pendingPercent}%`} theme="indigo" />
-                      <Card title="Delay %" value={`${emp.overall.delayPercent}%`} theme="rose" />
-                      <Card title="Overall Score" value={`${emp.overall.overallScore}%`} theme="blue" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {selectedEmployee !== "all" && allDashboardData.length > 0 && (
-              <div className="space-y-6 animate-fadeIn">
-                <SingleSection title="Delegation" data={allDashboardData[0]?.delegation} />
-                <SingleSection title="Checklist" data={allDashboardData[0]?.checklist} />
-                <SingleSection title="Help Tickets Assigned" data={allDashboardData[0]?.helpTicket?.assigned} />
-                <SingleSection title="Help Tickets Created" data={allDashboardData[0]?.helpTicket?.created} />
-                <SingleSection title="Support Tickets Assigned" data={allDashboardData[0]?.supportTicket?.assigned} />
-                <SingleSection title="Support Tickets Created" data={allDashboardData[0]?.supportTicket?.created} />
-              </div>
-            )}
+            {selectedEmployee === "all" 
+              ? renderAllEmployeesView()
+              : renderSingleEmployeeView()
+            }
             
             {allDashboardData.length === 0 && !loading && (
-                <div className="text-center py-20 bg-white rounded-3xl shadow-inner border-2 border-dashed border-slate-300">
-                    <p className="text-slate-400 font-bold uppercase tracking-widest">No Data Found for this selection</p>
-                </div>
+              <div className="text-center py-20 bg-white rounded-3xl shadow-inner border-2 border-dashed border-slate-300">
+                <p className="text-slate-400 font-bold uppercase tracking-widest">No Data Found for this selection</p>
+              </div>
             )}
           </div>
         )}
@@ -470,7 +548,8 @@ const sendBulkWhatsApp = async () => {
   );
 }
 
-// ... THEMES, Card, and SingleSection components remain exactly same ...
+// ================= COMPONENTS =================
+
 const THEMES = {
   blue: "bg-blue-600 text-white",
   amber: "bg-amber-500 text-white",
@@ -480,6 +559,17 @@ const THEMES = {
   slate: "bg-slate-700 text-white",
 };
 
+// Mini Card for grid layout
+function MiniCard({ title, value, theme }) {
+  return (
+    <div className={`${THEMES[theme]} p-3 rounded-lg text-center shadow transition-all duration-300 hover:scale-105`}>
+      <h3 className="text-[9px] uppercase font-black opacity-90">{title}</h3>
+      <p className="text-lg font-black mt-1">{value || 0}</p>
+    </div>
+  );
+}
+
+// Regular Card component (for single employee view)
 function Card({ title, value, theme }) {
   return (
     <div className={`${THEMES[theme]} p-4 rounded-xl text-center shadow transition-all duration-300 hover:scale-105 hover:rotate-1`}>
@@ -489,20 +579,34 @@ function Card({ title, value, theme }) {
   );
 }
 
-function SingleSection({ title, data }) {
+// Single Section for individual employee view
+function SingleSection({ title, data, showScore = false, formatPercent = (val) => val }) {
   if (!data || Object.keys(data).length === 0) return null;
+  
+  const calculateScore = (data) => {
+    const pendingPercent = parseFloat(data.pendingPercent || 0);
+    const delayPercent = parseFloat(data.delayPercent || 0);
+    const score = ((pendingPercent * 0.80) + (delayPercent * 0.20)).toFixed(2);
+    return `-${score}`;
+  };
+
+  const score = showScore ? calculateScore(data) : null;
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-lg transition-all overflow-hidden group">
       <div className="px-6 py-3 border-b bg-slate-50 group-hover:bg-indigo-50 transition-colors">
         <h2 className="font-black uppercase text-slate-700 group-hover:text-indigo-700">{title}</h2>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 p-6">
-        <Card title="Total Work" value={data.totalWork} theme="slate" />
-        <Card title="Completed" value={data.completedWork} theme="emerald" />
-        <Card title="On Time" value={data.onTimeWork} theme="emerald" />
-        <Card title="Pending" value={data.pendingWork} theme="amber" />
-        <Card title="Pending %" value={`${data.pendingPercent || 0}%`} theme="indigo" />
-        <Card title="Delay %" value={`${data.delayPercent || 0}%`} theme="rose" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 p-6">
+        <Card title="Total Work" value={data.totalWork || data.totalWork || 0} theme="slate" />
+        <Card title="Completed" value={data.completedWork || data.totalCompleted || 0} theme="emerald" />
+        <Card title="On Time" value={data.onTimeWork || data.totalOnTime || 0} theme="emerald" />
+        <Card title="Pending" value={data.pendingWork || data.totalPending || 0} theme="amber" />
+        <Card title="Pending %" value={formatPercent(data.pendingPercent)} theme="indigo" />
+        <Card title="Delay %" value={formatPercent(data.delayPercent)} theme="rose" />
+        {showScore && (
+          <Card title="Overall Score" value={score || formatPercent(data.overallScore)} theme="blue" />
+        )}
       </div>
     </div>
   );

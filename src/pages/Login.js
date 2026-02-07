@@ -15,7 +15,7 @@ export default function Login() {
   // If the user is already logged in, redirect them to the delegation page
   useEffect(() => {
     if (user) {
-      navigate("/delegation");
+      navigate("/dashboard");
     }
   }, [user, navigate]);
 
@@ -26,7 +26,7 @@ export default function Login() {
 
     try {
       await login(employeeID, password);
-      navigate("/delegation"); // Redirect after successful login
+      navigate("/dashboard"); // Redirect after successful login
     } catch (err) {
       setError(err.response?.data?.error || "Login failed");
     }

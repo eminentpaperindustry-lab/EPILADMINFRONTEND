@@ -30,7 +30,7 @@ export default function App() {
         path="/*"
         element={ user ? <Layout /> : <Navigate to="/login" replace /> }
       >
-        <Route index element={<Navigate to="delegation" replace />} />
+        <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="delegation" element={<Delegation />} />
         <Route path="checklist" element={<Checklist />} />
