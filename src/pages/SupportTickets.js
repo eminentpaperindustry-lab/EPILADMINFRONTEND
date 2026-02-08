@@ -442,10 +442,9 @@ export default function SupportTicket() {
   };
 
   const createTicket = async () => {
-    if (!form.AssignedTo || !form.Issue) return alert("All fields required");
+    if (!form.Issue) return alert("All fields required");
 
     setCreating(true);
-
     const tempTicket = {
       TicketID: "temp-" + Date.now(),
       Issue: form.Issue,
@@ -457,7 +456,7 @@ export default function SupportTicket() {
 
     try {
       const formData = new FormData();
-      formData.append("AssignedTo", form.AssignedTo);
+      // formData.append("AssignedTo", form.AssignedTo);
       formData.append("Issue", form.Issue);
       if (form.IssuePhoto) formData.append("IssuePhoto", form.IssuePhoto);
 
@@ -555,7 +554,7 @@ export default function SupportTicket() {
 
                       <div className="font-semibold">Problem : {t.Issue}</div>
                       <div className="text-sm">Created By: {t.CreatedBy}</div>
-                      <div className="text-sm">Assigned To: {t.AssignedTo}</div>
+                      <div className="text-sm">Assigned To: {"MIS TEAM "||t.AssignedTo}</div>
                       <div className="text-sm text-gray-500">{date.fromNow()}</div>
                     </div>
 
@@ -583,7 +582,7 @@ export default function SupportTicket() {
           {/* CREATE FORM */}
           <div className="bg-white p-6 rounded shadow mb-6">
             <h3 className="text-xl font-semibold mb-4">Create Ticket</h3>
-
+{/* 
             <select
               className="w-full border p-2 rounded mb-3"
               value={form.AssignedTo}
@@ -599,8 +598,8 @@ export default function SupportTicket() {
                 <option key={e.name} value={e.name}>
                   {e.name.toUpperCase()}
                 </option>
-              ))} */}
-            </select>
+              ))} 
+            </select> */}
 
             <textarea
               className="w-full border p-2 rounded mb-3"
@@ -644,39 +643,97 @@ export default function SupportTicket() {
             <div className="text-gray-500">No pending tickets</div>
           )}
 
-          {!createdTicketsLoading &&
-            createdTickets.map((t) => (
-              <div
-                key={t.TicketID}
-                className="bg-white p-4 rounded shadow mb-3 flex justify-between items-center"
-              >
-                <div>
-                     <div className="font-semibold">Ticket ID : {t.TicketID}</div>
+       {!createdTicketsLoading && (() => {
+  // Filter to show only unique issues (first occurrence)
+  const uniqueIssues = createdTickets.filter((ticket, index, self) =>
+    index === self.findIndex(t => t.Issue === ticket.Issue)
+  );
 
-                      <div className="font-semibold">Problem : {t.Issue}</div>
-                  <div className="text-sm text-gray-500">{dayjs(t.CreatedDate, DATE_FORMAT).fromNow()}</div>
-                </div>
+  return (
+    <div>
+      {uniqueIssues.length === 0 ? (
+        <div className="text-gray-500">No tickets created by you</div>
+      ) : (
+        uniqueIssues.map((t) => {
+          // Find all tickets with same issue
+          const sameIssueTickets = createdTickets.filter(
+            ticket => ticket.Issue === t.Issue
+          );
+          const allPending = sameIssueTickets.every(ticket => ticket.Status === "InProgress");
 
-                <div className="flex items-center gap-2">
-                  {t.IssuePhoto && (
-                    <button
-                      onClick={() => setModalImage(t.IssuePhoto)}
-                      className="bg-gray-700 text-white px-3 py-1 rounded"
-                    >
-                      View Image
-                    </button>
+          return (
+            <div
+              key={t.TicketID}
+              className="bg-white p-4 rounded shadow mb-3 flex justify-between items-center"
+            >
+              <div className="flex-1">
+                <div className="font-semibold">
+                  Problem: {t.Issue}
+                  {sameIssueTickets.length > 1 && (
+                    <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                      {sameIssueTickets.length} tickets
+                    </span>
                   )}
-
-                  <button
-                    disabled={updating === t.TicketID}
-                    onClick={() => markDone(t.TicketID)}
-                    className="bg-green-600 text-white px-3 py-1 rounded"
-                  >
-                    {updating === t.TicketID ? "Updating..." : "Mark Done"}
-                  </button>
+                </div>
+                
+                <div className="text-sm text-gray-600">
+                  {sameIssueTickets.length === 1 
+                    ? `Ticket ID: ${t.TicketID}`
+                    : `Multiple tickets (including ${t.TicketID})`
+                  }
+                </div>
+                
+                <div className="text-sm">
+                  Assigned To: {t.AssignedTo}
+                  {sameIssueTickets.length > 1 && (
+                    <span className="text-gray-500 ml-1">
+                      +{sameIssueTickets.length - 1} more
+                    </span>
+                  )}
+                </div>
+                
+                <div className="text-sm text-gray-500">
+                  {dayjs(t.CreatedDate, DATE_FORMAT).fromNow()}
                 </div>
               </div>
-            ))}
+
+              <div className="flex items-center gap-2">
+                {t.IssuePhoto && (
+                  <button
+                    onClick={() => setModalImage(t.IssuePhoto)}
+                    className="bg-gray-700 text-white px-3 py-1 rounded text-sm"
+                  >
+                    View Image
+                  </button>
+                )}
+
+                {allPending ? (
+                  <button
+                    disabled={updating === t.TicketID}
+                    onClick={() => {
+                      // Update all tickets with same issue
+                      sameIssueTickets.forEach(ticket => {
+                        markDone(ticket.TicketID);
+                      });
+                    }}
+                    className="bg-green-600 text-white px-3 py-1 rounded text-sm"
+                  >
+                    {updating === t.TicketID ? "Updating..." : "Mark All Done"}
+                  </button>
+                ) : (
+                  <div className="text-sm px-3 py-1 bg-gray-100 rounded">
+                    {t.Status}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+})()}
+
         </>
       )}
 

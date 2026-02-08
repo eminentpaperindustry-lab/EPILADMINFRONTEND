@@ -495,7 +495,9 @@ export default function Dashboard() {
                 </button>
                 <button 
                   onClick={sendBulkWhatsApp}
-                  disabled={loading || isUpdating}
+                  // disabled={loading || isUpdating}
+                  disabled={true}
+
                   className={`flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg transition-all active:scale-95 ${loading || isUpdating ? 'bg-slate-600' : 'bg-green-600 hover:bg-green-700'}`}
                 >
                   {isUpdating ? "SENDING..." : "WHATSAPP REPORT"}
