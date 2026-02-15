@@ -482,16 +482,20 @@ export default function SupportTicket() {
   };
 
   const markDone = async (id) => {
-    setUpdating(id);
-    setCreatedTickets((prev) => prev.filter((t) => t.TicketID !== id));
+      const cleanId = encodeURIComponent(id.trim());
 
+    setUpdating(id);
     try {
-      await axios.patch(`/support-tickets/status/${id}`, { Status: "Done" }, authHeader);
+      await axios.patch(
+        `/support-tickets/status/${cleanId}`,
+        { Status: "Done" },
+        authHeader
+      );
+      // ✅ Refresh after marking done
+      await loadCreatedTickets();
     } catch {
       alert("Failed to update");
-      await loadCreatedTickets();
     }
-
     setUpdating(null);
   };
 
