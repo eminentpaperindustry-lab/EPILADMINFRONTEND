@@ -127,8 +127,10 @@ export default function HelpTickets() {
 
   const markDone = async (id) => {
     setMarkingDone(id);
+          const cleanId = encodeURIComponent(id.trim());
+
     try {
-      await axios.patch(`/helpTickets/status/${id}`, { Status: "Done" }, authHeader);
+      await axios.patch(`/helpTickets/status/${cleanId}`, { Status: "Done" }, authHeader);
       setCreatedTickets(prev => prev.filter(t => t.TicketID !== id));
     } catch (err) {
       console.error(err);

@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useContext } from "react";
 import axios from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
@@ -13,14 +11,23 @@ import { useRef } from "react";
 export default function Checklist() {
   const { user } = useContext(AuthContext);
   const [checklists, setChecklists] = useState([]);
-  const [loading, setLoading] = useState(false);  // Loading state for checklist data
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("pending");
   const [processingTask, setProcessingTask] = useState(null);
   const [selectedEmp, setSelectedEmp] = useState("");
   const [employees, setEmployees] = useState([]);
-  const [employeeLoading, setEmployeeLoading] = useState(false);  // Loading state for employee data
-const [loadingDownload, setLoadingDownload] = useState(false);
+  const [employeeLoading, setEmployeeLoading] = useState(false);
+  const [loadingDownload, setLoadingDownload] = useState(false);
   const whatsappRef = useRef(null);
+  
+  // ========== CREATE TASK MODAL STATES ==========
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createTaskLoading, setCreateTaskLoading] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    task: "",
+    freq: "D",
+    dayOrDate: ""
+  });
 
   // ---------------- DATE PARSER ----------------
   const parseDate = (d) => {
@@ -44,7 +51,7 @@ const [loadingDownload, setLoadingDownload] = useState(false);
 
   // ---------------- LOAD EMPLOYEES ----------------
   const loadEmployees = async () => {
-    setEmployeeLoading(true);  // Start loading
+    setEmployeeLoading(true);
     try {
       const res = await axios.get("/employee/all", {
         headers: { Authorization: `Bearer ${user.token}` },
@@ -53,14 +60,14 @@ const [loadingDownload, setLoadingDownload] = useState(false);
     } catch (err) {
       toast.error("Failed to load employees");
     } finally {
-      setEmployeeLoading(false);  // End loading
+      setEmployeeLoading(false);
     }
   };
 
   // ---------------- LOAD CHECKLISTS ----------------
   const loadChecklists = async (employeeName) => {
     if (!employeeName) return;
-    setLoading(true);  // Start loading
+    setLoading(true);
     try {
       const res = await axios.get(`/checklist/search/by-name`, {
         headers: { Authorization: `Bearer ${user.token}` },
@@ -71,7 +78,7 @@ const [loadingDownload, setLoadingDownload] = useState(false);
       setChecklists([]);
       toast.error("Failed to load checklists");
     } finally {
-      setLoading(false);  // End loading
+      setLoading(false);
     }
   };
 
@@ -88,6 +95,70 @@ const [loadingDownload, setLoadingDownload] = useState(false);
       toast.error("Failed to mark task done");
     } finally {
       setProcessingTask(null);
+    }
+  };
+
+  // ========== CREATE TASK FUNCTION ==========
+  const handleCreateTask = async (e) => {
+    e.preventDefault();
+    
+    if (!selectedEmp) {
+      toast.warn("Please select an employee first");
+      return;
+    }
+    
+    if (selectedEmp === "all") {
+      toast.warn("Cannot create task for 'All Checklist'. Please select specific employee.");
+      return;
+    }
+    
+    if (!createForm.task) {
+      toast.warn("Task description is required");
+      return;
+    }
+    
+    if (createForm.freq !== 'D' && !createForm.dayOrDate) {
+      toast.warn(`Please enter ${createForm.freq === 'W' ? 'day (e.g., Monday)' : 'date (e.g., 15)'}`);
+      return;
+    }
+    
+    setCreateTaskLoading(true);
+    
+    try {
+      // API call with all required data
+      const response = await axios.post("/checklist/create-template", {
+        task: createForm.task,
+        freq: createForm.freq,
+        dayOrDate: createForm.freq !== 'D' ? createForm.dayOrDate : "",
+        employeeName: selectedEmp
+      }, {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      
+      // Success message
+      toast.success(`✅ Task created successfully!`);
+      
+      // Show how many tasks created for current month
+      if (response.data?.currentMonthTasks?.length > 0) {
+        toast.info(`📅 ${response.data.currentMonthTasks.length} tasks created for this month`);
+      }
+      
+      // Close modal and reset form
+      setShowCreateModal(false);
+      setCreateForm({
+        task: "",
+        freq: "D",
+        dayOrDate: ""
+      });
+      
+      // Reload checklists
+      loadChecklists(selectedEmp);
+      
+    } catch (err) {
+      console.error("Create task error:", err);
+      toast.error(err.response?.data?.error || "Failed to create task");
+    } finally {
+      setCreateTaskLoading(false);
     }
   };
 
@@ -121,57 +192,25 @@ const [loadingDownload, setLoadingDownload] = useState(false);
         const isDone = !!parseDate(c.Actual);
         const freq = c.Freq;
 
-        // -------- PENDING --------
-        // if (activeTab === "pending") {
-        //   if (isDone) return false;
-
-        //   if (freq === "D" && plannedDate < today) return true;
-
-        //   if (freq === "W") {
-        //     const { end } = getWeekRange(plannedDate);
-        //     return end < today;
-        //   }
-
-        //   if (freq === "M") {
-        //     return (
-        //       plannedDate.getFullYear() < today.getFullYear() ||
-        //       (plannedDate.getFullYear() === today.getFullYear() &&
-        //         plannedDate.getMonth() < today.getMonth())
-        //     );
-        //   }
-
-        //   if (freq === "Y") {
-        //     return plannedDate.getFullYear() < today.getFullYear();
-        //   }
-
-        //   return false;
-        // }
-
-          if (activeTab === "pending") {
+        if (activeTab === "pending") {
           if (isDone) return false;
 
           if (freq === "D" && plannedDate < today) return true;
-
           if (freq === "W" && plannedDate < today) return true;
-
           if (freq === "M" && plannedDate < today) return true;
-
           if (freq === "Y" && plannedDate < today) return true;
 
           return false;
         }
 
-        // -------- DAILY --------
         if (activeTab === "Daily") {
           return freq === "D" && !isDone && plannedDate.getTime() === today.getTime();
         }
 
-        // -------- WEEKLY --------
         if (activeTab === "Weekly") {
           return freq === "W" && !isDone && plannedDate >= weekStart && plannedDate <= weekEnd;
         }
 
-        // -------- MONTHLY --------
         if (activeTab === "Monthly") {
           return (
             freq === "M" &&
@@ -181,7 +220,6 @@ const [loadingDownload, setLoadingDownload] = useState(false);
           );
         }
 
-        // -------- YEARLY --------
         if (activeTab === "Yearly") {
           return (
             freq === "Y" &&
@@ -202,222 +240,113 @@ const [loadingDownload, setLoadingDownload] = useState(false);
     if (selectedEmp) loadChecklists(selectedEmp);
   }, [selectedEmp]);
 
-// const sendPendingChecklistWhatsApp = async () => {
-//   if (!selectedEmp) {
-//     toast.warn("Select employee first");
-//     return;
-//   }
-
-//   setLoadingDownload(true);
-
-//   try {
-//     const today = new Date();
-//     today.setHours(0, 0, 0, 0);
-
-//     // 🔹 Helper: filter pending tasks
-//     const getPendingTasks = (tasks) => {
-//       return (tasks || []).filter((task) => {
-//         if (!task.Planned) return false;
-//         if (task.Actual) return false;
-
-//         const [datePart, timePart] = task.Planned.split(" ");
-//         const [day, month, year] = datePart.split("/");
-//         const [hour, minute, second] = (timePart || "00:00:00").split(":");
-
-//         const plannedDate = new Date(year, month - 1, day, hour, minute, second);
-//         plannedDate.setHours(0, 0, 0, 0);
-
-//         return plannedDate <= today;
-//       });
-//     };
-
-//     // 🔹 CASE 1: ALL employees
-//     if (selectedEmp === "all") {
-//       for (const emp of employees) {
-//         if (!emp.number) continue;
-
-//         const res = await axios.get(`/checklist/search/by-name`, {
-//           headers: { Authorization: `Bearer ${user.token}` },
-//           params: { name: emp.name },
-//         });
-
-//         const pendingTasks = getPendingTasks(res.data);
-
-//         if (pendingTasks.length === 0) continue;
-
-//         const taskList = pendingTasks.map((t) => t.Task);
-
-//         await axios.post(
-//           "/whatsapp/send-checklist",
-//           {
-//             number: `91${emp.number}`,
-//             employeeName: emp.name,
-//             tasks: taskList,
-//           },
-//           {
-//             headers: { Authorization: `Bearer ${user.token}` },
-//           }
-//         );
-//       }
-
-//       toast.success("All employees ko unka pending checklist bhej diya ✅");
-//       return;
-//     }
-
-//     // 🔹 CASE 2: Single employee
-//     const res = await axios.get(`/checklist/search/by-name`, {
-//       headers: { Authorization: `Bearer ${user.token}` },
-//       params: { name: selectedEmp },
-//     });
-
-//     const pendingTasks = getPendingTasks(res.data);
-
-//     if (pendingTasks.length === 0) {
-//       toast.info("No pending checklist tasks to send");
-//       return;
-//     }
-
-//     const taskList = pendingTasks.map((t) => t.Task);
-
-//     const empObj = employees.find((emp) => emp.name === selectedEmp);
-//     if (!empObj?.number) {
-//       toast.warn("Employee WhatsApp number missing");
-//       return;
-//     }
-
-//     await axios.post(
-//       "/whatsapp/send-checklist",
-//       {
-//         number: `91${empObj.number}`,
-//         employeeName: selectedEmp,
-//         tasks: taskList,
-//       },
-//       {
-//         headers: { Authorization: `Bearer ${user.token}` },
-//       }
-//     );
-
-//     toast.success("WhatsApp message sent automatically ✅");
-
-//   } catch (err) {
-//     console.error(err.response?.data || err.message);
-//     toast.error("WhatsApp send failed ❌");
-//   } finally {
-//     setLoadingDownload(false);
-//   }
-// };
-
-
-
-
-const sendPendingChecklistWhatsApp = async () => {
-  if (!selectedEmp) {
-    toast.warn("Select employee first");
-    return;
-  }
-
-  // 🔥 MUST BE FIRST LINE (NO STATE CHANGE BEFORE)
-  whatsappRef.current = window.open("", "_blank");
-
-  if (!whatsappRef.current) {
-    toast.error("Popup blocked. Allow popups for this site.");
-    return;
-  }
-
-  whatsappRef.current.document.write("Preparing WhatsApp message...");
-
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const res = await axios.get(`/checklist/search/by-name`, {
-      headers: { Authorization: `Bearer ${user.token}` },
-      params: { name: selectedEmp },
-    });
-
-    const data = (res.data || []).filter((t) => {
-      if (!t.Planned || t.Actual) return false;
-      const [d, m, y] = t.Planned.split(" ")[0].split("/");
-      const plannedDate = new Date(y, m - 1, d);
-      plannedDate.setHours(0, 0, 0, 0);
-      return plannedDate <= today;
-    });
-
-    if (!data.length) {
-      whatsappRef.current.close();
-      toast.info("No pending tasks");
+  const sendPendingChecklistWhatsApp = async () => {
+    if (!selectedEmp) {
+      toast.warn("Select employee first");
       return;
     }
 
-    const taskList = data.map((c, i) => `${i + 1}. ${c.Task}`).join("\n");
+    whatsappRef.current = window.open("", "_blank");
 
-    const emp = employees.find(e => e.name === selectedEmp);
-    if (!emp?.number) {
-      whatsappRef.current.close();
-      toast.warn("WhatsApp number not found");
+    if (!whatsappRef.current) {
+      toast.error("Popup blocked. Allow popups for this site.");
       return;
     }
 
-    const msg = encodeURIComponent(
-      `Hi ${selectedEmp}, please complete your pending tasks:\n\n${taskList}`
-    );
+    whatsappRef.current.document.write("Preparing WhatsApp message...");
 
-    // 🔥 REDIRECT SAME TAB
-    whatsappRef.current.location.replace(
-      `https://wa.me/${emp.number}?text=${msg}`
-    );
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-    toast.info("WhatsApp opened. Please send the message");
+      const res = await axios.get(`/checklist/search/by-name`, {
+        headers: { Authorization: `Bearer ${user.token}` },
+        params: { name: selectedEmp },
+      });
 
-  } catch (err) {
-    whatsappRef.current?.close();
-    toast.error("Something went wrong");
-  }
-};
+      const data = (res.data || []).filter((t) => {
+        if (!t.Planned || t.Actual) return false;
+        const [d, m, y] = t.Planned.split(" ")[0].split("/");
+        const plannedDate = new Date(y, m - 1, d);
+        plannedDate.setHours(0, 0, 0, 0);
+        return plannedDate <= today;
+      });
 
+      if (!data.length) {
+        whatsappRef.current.close();
+        toast.info("No pending tasks");
+        return;
+      }
 
+      const taskList = data.map((c, i) => `${i + 1}. ${c.Task}`).join("\n");
+
+      const emp = employees.find(e => e.name === selectedEmp);
+      if (!emp?.number) {
+        whatsappRef.current.close();
+        toast.warn("WhatsApp number not found");
+        return;
+      }
+
+      const msg = encodeURIComponent(
+        `Hi ${selectedEmp}, please complete your pending tasks:\n\n${taskList}`
+      );
+
+      whatsappRef.current.location.replace(
+        `https://wa.me/${emp.number}?text=${msg}`
+      );
+
+      toast.info("WhatsApp opened. Please send the message");
+
+    } catch (err) {
+      whatsappRef.current?.close();
+      toast.error("Something went wrong");
+    }
+  };
 
   // ---------------- UI ----------------
   return (
     <div className="p-4 sm:p-6">
       <h1 className="text-xl sm:text-2xl font-semibold mb-4">Checklist</h1>
 
-      {/* Employee Select */}
-      <select
-        className="w-full border p-2 rounded mb-4"
-        value={selectedEmp}
-        onChange={(e) => setSelectedEmp(e.target.value)}
+      {/* Employee Select and Create Task Button */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <select
+          className="w-full sm:flex-1 border p-2 rounded"
+          value={selectedEmp}
+          onChange={(e) => setSelectedEmp(e.target.value)}
+        >
+          <option value="">-- Select Employee --</option>
+          <option value="all">All Checklist</option>
+          {employeeLoading ? (
+            <option>Loading Employees...</option>
+          ) : (
+            employees.map((emp) => (
+              <option key={emp.name} value={emp.name}>{emp.name}</option>
+            ))
+          )}
+        </select>
+        
+        {/* Create Task Button */}
+        <button
+          onClick={() => setShowCreateModal(true)}
+          disabled={!selectedEmp || selectedEmp === "all"}
+          className={`px-4 py-2 rounded whitespace-nowrap ${
+            !selectedEmp || selectedEmp === "all"
+              ? "bg-gray-300 cursor-not-allowed"
+              : "bg-blue-600 text-white hover:bg-blue-700"
+          }`}
+        >
+          + Create Task
+        </button>
+      </div>
+
+      <button
+        className="bg-gray-700 text-white px-4 py-2 rounded mb-4"
+        onClick={sendPendingChecklistWhatsApp}
+        disabled={loadingDownload}
       >
-        <option value="">-- Select Employee --</option>
-        <option value="all">All Checklist</option>
-        {employeeLoading ? (
-          <option>Loading Employees...</option>
-        ) : (
-          employees.map((emp) => (
-            <option key={emp.name} value={emp.name}>{emp.name}</option>
-          ))
-        )}
-      </select>
-{/* 
-      <button
-  className="bg-gray-700 text-white px-4 py-2 rounded mb-4"
-  onClick={sendPendingChecklistWhatsApp}
-
-   disabled={loadingDownload} // Disable while loading
->
-  {loadingDownload ? "Loading..." : " Flow-Up Pending Checklist"}
-</button> */}
-
-
-      <button
-  className="bg-gray-700 text-white px-4 py-2 rounded mb-4"
-  onClick={sendPendingChecklistWhatsApp}
-
-   disabled={loadingDownload} // Disable while loading
->
-  {loadingDownload ? "Loading..." : " Flow-Up Pending Checklist"}
-</button>
-
+        {loadingDownload ? "Loading..." : "Flow-Up Pending Checklist"}
+      </button>
 
       {/* Tabs */}
       {selectedEmp && !employeeLoading && (
@@ -465,6 +394,112 @@ const sendPendingChecklistWhatsApp = async () => {
 
       {filteredChecklists().length === 0 && !loading && (
         <p className="text-center text-gray-500 mt-4">No data found.</p>
+      )}
+
+      {/* ========== CREATE TASK MODAL ========== */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h2 className="text-xl font-semibold mb-4">
+              Create New Task for <span className="text-blue-600">{selectedEmp}</span>
+            </h2>
+            
+            <form onSubmit={handleCreateTask}>
+              {/* Task Description */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">Task Description *</label>
+                <input
+                  type="text"
+                  value={createForm.task}
+                  onChange={(e) => setCreateForm({...createForm, task: e.target.value})}
+                  className="w-full border rounded p-2"
+                  placeholder="Enter task description"
+                  required
+                />
+              </div>
+              
+              {/* Frequency Selection */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">Frequency *</label>
+                <select
+                  value={createForm.freq}
+                  onChange={(e) => {
+                    setCreateForm({
+                      ...createForm, 
+                      freq: e.target.value,
+                      dayOrDate: ""
+                    });
+                  }}
+                  className="w-full border rounded p-2"
+                >
+                  <option value="D">Daily</option>
+                  <option value="W">Weekly</option>
+                  <option value="M">Monthly</option>
+                  <option value="Y">Yearly</option>
+                </select>
+              </div>
+              
+              {/* Day/Date Input */}
+              {createForm.freq !== 'D' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-1">
+                    {createForm.freq === 'W' ? 'Select Day *' : 'Enter Date *'}
+                  </label>
+                  
+                  {createForm.freq === 'W' ? (
+                    <select
+                      value={createForm.dayOrDate}
+                      onChange={(e) => setCreateForm({...createForm, dayOrDate: e.target.value})}
+                      className="w-full border rounded p-2"
+                      required
+                    >
+                      <option value="">-- Select Day --</option>
+                      <option value="Monday">Monday</option>
+                      <option value="Tuesday">Tuesday</option>
+                      <option value="Wednesday">Wednesday</option>
+                      <option value="Thursday">Thursday</option>
+                      <option value="Friday">Friday</option>
+                      <option value="Saturday">Saturday</option>
+                      <option value="Sunday">Sunday</option>
+                    </select>
+                  ) : (
+                    <input
+                      type="number"
+                      value={createForm.dayOrDate}
+                      onChange={(e) => setCreateForm({...createForm, dayOrDate: e.target.value})}
+                      className="w-full border rounded p-2"
+                      placeholder="Enter date (1-31)"
+                      min="1"
+                      max="31"
+                      required
+                    />
+                  )}
+                </div>
+              )}
+              
+              {/* Buttons */}
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setCreateForm({task: "", freq: "D", dayOrDate: ""});
+                  }}
+                  className="px-4 py-2 border rounded hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createTaskLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
+                >
+                  {createTaskLoading ? "Creating..." : "Create Task"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       <ToastContainer position="top-right" autoClose={3000} />
