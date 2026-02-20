@@ -18,7 +18,7 @@ export default function HelpTickets() {
   const [filters, setFilters] = useState({
     assignedTo: "",
     createdBy: "",
-    status: "",
+    status: "", // Added status filter
   });
 
   const [form, setForm] = useState({
@@ -84,10 +84,22 @@ export default function HelpTickets() {
     }
   };
 
+  // ================= STATUS FILTER HANDLER =================
+  const handleStatusFilter = (status) => {
+    setFilters(prev => ({ ...prev, status }));
+  };
+
   // ================= INITIAL LOAD =================
   useEffect(() => {
     handleTabSwitch("all"); // First tab active
   }, []);
+
+  // ================= LOAD TICKETS WHEN FILTERS CHANGE =================
+  useEffect(() => {
+    if (activeTab === "all") {
+      loadTickets();
+    }
+  }, [filters.status]); // Reload when status filter changes
 
   // ================= ACTIONS =================
   const handleFileChange = (e) => {
@@ -127,7 +139,7 @@ export default function HelpTickets() {
 
   const markDone = async (id) => {
     setMarkingDone(id);
-          const cleanId = encodeURIComponent(id.trim());
+    const cleanId = encodeURIComponent(id.trim());
 
     try {
       await axios.patch(`/helpTickets/status/${cleanId}`, { Status: "Done" }, authHeader);
@@ -168,11 +180,35 @@ export default function HelpTickets() {
               {markingDone === ticket.TicketID ? "Marking..." : "Mark Done"}
             </button>
           ) : (
-            <span className="bg-blue-600 text-white px-3 py-1 rounded">{ticket.Status}</span>
+            <span className={`px-3 py-1 rounded text-white ${
+              ticket.Status === "Pending" ? "bg-yellow-500" :
+              ticket.Status === "InProgress" ? "bg-blue-500" :
+              ticket.Status === "Done" ? "bg-green-500" :
+              "bg-gray-500"
+            }`}>
+              {ticket.Status}
+            </span>
           )}
         </div>
       </div>
     );
+  };
+
+  // Function to get status tab color
+  const getStatusTabColor = (status) => {
+    if (filters.status === status) {
+      switch(status) {
+        case "Pending":
+          return "bg-yellow-500 text-white";
+        case "InProgress":
+          return "bg-blue-500 text-white";
+        case "Done":
+          return "bg-green-500 text-white";
+        default:
+          return "bg-purple-600 text-white"; // For "All" tab
+      }
+    }
+    return "bg-gray-200 text-gray-700 hover:bg-gray-300";
   };
 
   return (
@@ -183,13 +219,21 @@ export default function HelpTickets() {
       <div className="flex gap-4 mb-6">
         <button
           onClick={() => handleTabSwitch("all")}
-          className={`px-4 py-2 rounded ${activeTab === "all" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
+          className={`px-4 py-2 rounded transition-colors ${
+            activeTab === "all" 
+              ? "bg-blue-600 text-white" 
+              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+          }`}
         >
           All Help Tickets
         </button>
         <button
           onClick={() => handleTabSwitch("create")}
-          className={`px-4 py-2 rounded ${activeTab === "create" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
+          className={`px-4 py-2 rounded transition-colors ${
+            activeTab === "create" 
+              ? "bg-blue-600 text-white" 
+              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+          }`}
         >
           Create Help Ticket
         </button>
@@ -197,11 +241,45 @@ export default function HelpTickets() {
 
       {/* ================= ALL TICKETS ================= */}
       {activeTab === "all" && (
-        <div className="flex-1 overflow-y-auto pr-2">
-          {loading && <div className="text-center py-6 text-gray-500">Loading tickets...</div>}
-          {!loading && tickets.length === 0 && <div className="text-center py-6 text-gray-500">No tickets available</div>}
-          {!loading && tickets.map(t => <TicketCard key={t.TicketID} ticket={t} showMarkDone={false} />)}
-        </div>
+        <>
+          {/* STATUS FILTER TABS - With different colors */}
+          <div className="bg-white p-4 rounded shadow mb-4 flex gap-2">
+            <button
+              onClick={() => handleStatusFilter("")}
+              className={`px-4 py-2 rounded transition-colors ${getStatusTabColor("")}`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => handleStatusFilter("Pending")}
+              className={`px-4 py-2 rounded transition-colors ${getStatusTabColor("Pending")}`}
+            >
+              Pending
+            </button>
+            <button
+              onClick={() => handleStatusFilter("InProgress")}
+              className={`px-4 py-2 rounded transition-colors ${getStatusTabColor("InProgress")}`}
+            >
+              In Progress
+            </button>
+            <button
+              onClick={() => handleStatusFilter("Done")}
+              className={`px-4 py-2 rounded transition-colors ${getStatusTabColor("Done")}`}
+            >
+              Done
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto pr-2">
+            {loading && <div className="text-center py-6 text-gray-500">Loading tickets...</div>}
+            {!loading && tickets.length === 0 && (
+              <div className="text-center py-6 text-gray-500">
+                {filters.status ? `No ${filters.status} tickets available` : "No tickets available"}
+              </div>
+            )}
+            {!loading && tickets.map(t => <TicketCard key={t.TicketID} ticket={t} showMarkDone={false} />)}
+          </div>
+        </>
       )}
 
       {/* ================= CREATE TAB ================= */}
@@ -244,7 +322,11 @@ export default function HelpTickets() {
             <button
               disabled={creating || !form.AssignedTo || !form.Issue.trim()}
               onClick={createTicket}
-              className={`px-6 py-3 rounded text-white ${creating || !form.AssignedTo || !form.Issue.trim() ? "bg-gray-400" : "bg-green-600"}`}
+              className={`px-6 py-3 rounded text-white transition-colors ${
+                creating || !form.AssignedTo || !form.Issue.trim() 
+                  ? "bg-gray-400 cursor-not-allowed" 
+                  : "bg-green-600 hover:bg-green-700"
+              }`}
             >
               {creating ? "Creating Ticket..." : "Create Ticket"}
             </button>
@@ -264,31 +346,29 @@ export default function HelpTickets() {
       )}
 
       {/* ================= IMAGE MODAL ================= */}
- {/* ================= IMAGE MODAL ================= */}
-{modalImage && (
-  <div
-    className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50"
-    onClick={() => setModalImage(null)}
-  >
-    <div className="relative">
-      {/* Close Button */}
-      <button
-        className="absolute top-2 right-2 text-white text-2xl font-bold bg-black bg-opacity-50 rounded-full w-10 h-10 flex items-center justify-center hover:bg-opacity-80"
-        onClick={() => setModalImage(null)}
-      >
-        ×
-      </button>
+      {modalImage && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50"
+          onClick={() => setModalImage(null)}
+        >
+          <div className="relative">
+            {/* Close Button */}
+            <button
+              className="absolute top-2 right-2 text-white text-2xl font-bold bg-black bg-opacity-50 rounded-full w-10 h-10 flex items-center justify-center hover:bg-opacity-80"
+              onClick={() => setModalImage(null)}
+            >
+              ×
+            </button>
 
-      <img
-        src={modalImage}
-        alt="Issue"
-        className="max-w-[90vw] max-h-[90vh] rounded shadow-lg"
-        onClick={e => e.stopPropagation()} // Prevent modal close when clicking image
-      />
-    </div>
-  </div>
-)}
-
+            <img
+              src={modalImage}
+              alt="Issue"
+              className="max-w-[90vw] max-h-[90vh] rounded shadow-lg"
+              onClick={e => e.stopPropagation()} // Prevent modal close when clicking image
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
