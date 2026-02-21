@@ -157,6 +157,85 @@ filtered.sort((a, b) => {
 };
 
 
+const downloadDelegationReportCompletd = () => {
+  if (!selectedEmp) {
+    toast.warn("Select employee first");
+    return;
+  }
+
+  const filtered = tasks.filter(
+    t => t.Status === "Completed" && t.Taskcompletedapproval !== "Approved"
+  );
+
+
+
+
+  if (filtered.length === 0) {
+    toast.info("No tasks to download");
+    return;
+  }
+
+  // filtered.sort((a, b) => a.Status.localeCompare(b.Status));
+filtered.sort((a, b) => {
+  // 1️⃣ Pehle Name ke hisaab se
+  const nameCompare = (a.Name || "").localeCompare(b.Name || "");
+  if (nameCompare !== 0) return nameCompare;
+
+  // 2️⃣ Same Name wale tasks me Status ke hisaab se order
+  return (a.Status || "").localeCompare(b.Status || "");
+});
+
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  doc.setFontSize(14);
+  doc.text(`Delegation Report - ${selectedEmp}`, 14, 15);
+
+  autoTable(doc, {
+    head: [[
+      "Name",
+      "Task Name",
+      "Created Date",
+      "Deadline",
+      "Final Date",
+      "Revisions",
+      "Status"
+    ]],
+    body: filtered.map(t => [
+      t.Name || "",
+      t.TaskName || "",
+      t.CreatedDate || "--",
+      t.Deadline || "--",
+      t.FinalDate || "--",
+      t.Revisions || "--",
+      t.Status 
+    ]),
+    startY: 22,
+    theme: "grid",
+    styles: {
+      fontSize: 9,
+      cellPadding: 2,
+      overflow: "linebreak",
+    },
+    columnStyles: {
+      1: { cellWidth: 60 }, // Task Name column (spaces + long text)
+      0:{cellWidth:20}
+    },
+  });
+
+  doc.save(
+    `delegation_report_${selectedEmp}_${new Date()
+      .toISOString()
+      .slice(0, 10)}.pdf`
+  );
+
+  toast.success("Delegation report downloaded");
+};
+
+
 const sendPendingDelegationWhatsApp = async () => {
   if (!selectedEmp) {
     toast.warn("Select employee first");
@@ -743,7 +822,11 @@ const updateTask = async () => {
           </button>
 
        <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={downloadDelegationReport}>
-            Download Report
+            Download Pending Completed Report
+          </button>
+
+           <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={downloadDelegationReportCompletd}>
+            Download Completed Report
           </button>
 
 <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={delegationFlowup}>
