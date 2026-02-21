@@ -1,4 +1,4 @@
-import React, { useEffect, useState,useRef, useContext } from "react";
+import React, { useEffect, useState, useRef, useContext } from "react";
 import axios from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
 import { ToastContainer, toast } from "react-toastify";
@@ -8,7 +8,7 @@ import autoTable from "jspdf-autotable";
 
 export default function Delegation() {
   const { user } = useContext(AuthContext);
-const [assignBy, setAssignBy] = useState("");
+  const [assignBy, setAssignBy] = useState("");
 
   const [employees, setEmployees] = useState([]);
   const [admin, setAdmin] = useState([]);
@@ -29,12 +29,27 @@ const [assignBy, setAssignBy] = useState("");
   const whatsappRef = useRef(null);
 
   const [showCreate, setShowCreate] = useState(false);
+  const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+  const dropdownRef = useRef(null);
   const [form, setForm] = useState({
     TaskName: "",
     Deadline: "",
     Priority: "",
     Notes: "",
   });
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDownloadDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // -----------------------
   function formatDateDDMMYYYYHHMMSS(date = new Date()) {
@@ -53,305 +68,346 @@ const [assignBy, setAssignBy] = useState("");
   }
 
   // ----------------------- Download Report
-  // const downloadDelegationReport = () => {
-  //   if (!selectedEmp) { toast.warn("Select employee first"); return; }
-  //   const filtered = tasks.filter(t => t.Taskcompletedapproval !== "Approved");
-  //   if (filtered.length === 0) { toast.info("No tasks to download"); return; }
-
-  //   // Sort: Pending first, then Completed
-  //   filtered.sort((a,b)=>a.Status.localeCompare(b.Status));
-
-  //   const headers = ["TaskID","Name","TaskName","CreatedDate","Deadline","FinalDate","Revisions","Status"];
-  //   const rows = filtered.map(t => headers.map(h => `"${t[h] ?? ""}"`).join(","));
-  //   const csvContent = [headers.join(","), ...rows].join("\n");
-
-  //   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  //   const url = URL.createObjectURL(blob);
-  //   const link = document.createElement("a");
-  //   link.href = url;
-  //   link.setAttribute("download", `delegation_report_${selectedEmp}_${new Date().toISOString().slice(0,10)}.csv`);
-  //   document.body.appendChild(link);
-  //   link.click();
-  //   document.body.removeChild(link);
-  //   URL.revokeObjectURL(url);
-  //   toast.success("Delegation report downloaded");
-  // };
-
-
-const downloadDelegationReport = () => {
-  if (!selectedEmp) {
-    toast.warn("Select employee first");
-    return;
-  }
-
-  const filtered = tasks.filter(
-    t => t.Taskcompletedapproval !== "Approved"
-  );
-
-
-
-
-  if (filtered.length === 0) {
-    toast.info("No tasks to download");
-    return;
-  }
-
-  // filtered.sort((a, b) => a.Status.localeCompare(b.Status));
-filtered.sort((a, b) => {
-  // 1️⃣ Pehle Name ke hisaab se
-  const nameCompare = (a.Name || "").localeCompare(b.Name || "");
-  if (nameCompare !== 0) return nameCompare;
-
-  // 2️⃣ Same Name wale tasks me Status ke hisaab se order
-  return (a.Status || "").localeCompare(b.Status || "");
-});
-
-  const doc = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "a4",
-  });
-
-  doc.setFontSize(14);
-  doc.text(`Delegation Report - ${selectedEmp}`, 14, 15);
-
-  autoTable(doc, {
-    head: [[
-      "Name",
-      "Task Name",
-      "Created Date",
-      "Deadline",
-      "Final Date",
-      "Revisions",
-      "Status"
-    ]],
-    body: filtered.map(t => [
-      t.Name || "",
-      t.TaskName || "",
-      t.CreatedDate || "--",
-      t.Deadline || "--",
-      t.FinalDate || "--",
-      t.Revisions || "--",
-      t.Status 
-    ]),
-    startY: 22,
-    theme: "grid",
-    styles: {
-      fontSize: 9,
-      cellPadding: 2,
-      overflow: "linebreak",
-    },
-    columnStyles: {
-      1: { cellWidth: 60 }, // Task Name column (spaces + long text)
-      0:{cellWidth:20}
-    },
-  });
-
-  doc.save(
-    `delegation_report_${selectedEmp}_${new Date()
-      .toISOString()
-      .slice(0, 10)}.pdf`
-  );
-
-  toast.success("Delegation report downloaded");
-};
-
-
-const downloadDelegationReportCompletd = () => {
-  if (!selectedEmp) {
-    toast.warn("Select employee first");
-    return;
-  }
-
-  const filtered = tasks.filter(
-    t => t.Status === "Completed" && t.Taskcompletedapproval !== "Approved"
-  );
-
-
-
-
-  if (filtered.length === 0) {
-    toast.info("No tasks to download");
-    return;
-  }
-
-  // filtered.sort((a, b) => a.Status.localeCompare(b.Status));
-filtered.sort((a, b) => {
-  // 1️⃣ Pehle Name ke hisaab se
-  const nameCompare = (a.Name || "").localeCompare(b.Name || "");
-  if (nameCompare !== 0) return nameCompare;
-
-  // 2️⃣ Same Name wale tasks me Status ke hisaab se order
-  return (a.Status || "").localeCompare(b.Status || "");
-});
-
-  const doc = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "a4",
-  });
-
-  doc.setFontSize(14);
-  doc.text(`Delegation Report - ${selectedEmp}`, 14, 15);
-
-  autoTable(doc, {
-    head: [[
-      "Name",
-      "Task Name",
-      "Created Date",
-      "Deadline",
-      "Final Date",
-      "Revisions",
-      "Status"
-    ]],
-    body: filtered.map(t => [
-      t.Name || "",
-      t.TaskName || "",
-      t.CreatedDate || "--",
-      t.Deadline || "--",
-      t.FinalDate || "--",
-      t.Revisions || "--",
-      t.Status 
-    ]),
-    startY: 22,
-    theme: "grid",
-    styles: {
-      fontSize: 9,
-      cellPadding: 2,
-      overflow: "linebreak",
-    },
-    columnStyles: {
-      1: { cellWidth: 60 }, // Task Name column (spaces + long text)
-      0:{cellWidth:20}
-    },
-  });
-
-  doc.save(
-    `delegation_report_${selectedEmp}_${new Date()
-      .toISOString()
-      .slice(0, 10)}.pdf`
-  );
-
-  toast.success("Delegation report downloaded");
-};
-
-
-const sendPendingDelegationWhatsApp = async () => {
-  if (!selectedEmp) {
-    toast.warn("Select employee first");
-    return;
-  }
-
-  try {
-    const pending = tasks.filter(
-      t =>
-        t.Deadline <= formatDateDDMMYYYYHHMMSS() &&
-        t.Status !== "Completed"
-    );
-
-    if (pending.length === 0) {
-      toast.info("No pending delegation tasks");
-      return;
-    }
-
-    // helper
-    const sendWA = async (empName, empNumber, empTasks) => {
-      if (!empNumber || empTasks.length === 0) return;
-
-      const payload = {
-        number: `91${empNumber}`,
-        employeeName: empName,
-        delegations: empTasks.map(t => t.TaskName) // ✅ ARRAY
-      };
-
-      console.log("WA Payload 👉", payload); // 🧪 DEBUG (important)
-
-      await axios.post(
-        "/whatsapp/send-delegation",   // ✅ CORRECT API
-        payload,
-        {
-          headers: { Authorization: `Bearer ${user.token}` }
-        }
-      );
-    };
-
-    // 🔹 ALL case
-    if (selectedEmp === "all") {
-      const map = {};
-
-      pending.forEach(t => {
-        if (!t.Name) return;
-        if (!map[t.Name]) map[t.Name] = [];
-        map[t.Name].push(t);
-      });
-
-      await Promise.all(
-        Object.keys(map).map(name => {
-          const emp = employees.find(e => e.name === name);
-          if (!emp?.number) return;
-          return sendWA(name, emp.number, map[name]);
-        })
-      );
-
-      toast.success("All employees ko delegation WhatsApp bhej diya 🚀");
-      return;
-    }
-
-    // 🔹 Single employee
-    const empTasks = pending.filter(t => t.Name === selectedEmp);
-    if (empTasks.length === 0) {
-      toast.info("No pending tasks");
-      return;
-    }
-
-    const emp = employees.find(e => e.name === selectedEmp);
-    if (!emp?.number) {
-      toast.warn("Employee WhatsApp number missing");
-      return;
-    }
-
-    await sendWA(selectedEmp, emp.number, empTasks);
-    toast.success("Delegation WhatsApp sent ✅");
-
-  } catch (err) {
-    console.error(err);
-    toast.error("WhatsApp send failed ❌");
-  }
-};
-
-
-const delegationFlowup = async () => {
-  try {
+  const downloadDelegationReport = () => {
     if (!selectedEmp) {
       toast.warn("Select employee first");
       return;
     }
 
-    // 🔹 Pending tasks filter FIRST (no popup yet)
-    const pending = tasks.filter(
-      t =>
-        t.Deadline <= formatDateDDMMYYYYHHMMSS() &&
-        t.Status !== "Completed" &&
-        t.Name === selectedEmp
+    const filtered = tasks.filter(
+      t => t.Taskcompletedapproval !== "Approved"
     );
 
-    if (pending.length === 0) {
-      toast.info("No pending tasks");
-      return; // 🚫 NO WINDOW OPEN
-    }
-
-    const emp = employees.find(e => e.name === selectedEmp);
-    if (!emp?.number) {
-      toast.warn("Employee WhatsApp number missing");
+    if (filtered.length === 0) {
+      toast.info("No tasks to download");
       return;
     }
 
-    // 🔹 Beautiful numbered task list
-    const taskList = pending
-      .map((t, i) => `${i + 1}. ${t.TaskName}`)
-      .join("\n");
+    filtered.sort((a, b) => {
+      // 1️⃣ First sort by Name
+      const nameCompare = (a.Name || "").localeCompare(b.Name || "");
+      if (nameCompare !== 0) return nameCompare;
 
-    const message = encodeURIComponent(
+      // 2️⃣ Then sort by Status for same Name
+      return (a.Status || "").localeCompare(b.Status || "");
+    });
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    doc.setFontSize(14);
+    doc.text(`Delegation Report (Pending & Completed) - ${selectedEmp}`, 14, 15);
+
+    autoTable(doc, {
+      head: [[
+        "Name",
+        "Task Name",
+        "Created Date",
+        "Deadline",
+        "Final Date",
+        "Revisions",
+        "Status"
+      ]],
+      body: filtered.map(t => [
+        t.Name || "",
+        t.TaskName || "",
+        t.CreatedDate || "--",
+        t.Deadline || "--",
+        t.FinalDate || "--",
+        t.Revisions || "--",
+        t.Status 
+      ]),
+      startY: 22,
+      theme: "grid",
+      styles: {
+        fontSize: 9,
+        cellPadding: 2,
+        overflow: "linebreak",
+      },
+      columnStyles: {
+        1: { cellWidth: 60 }, // Task Name column
+        0: { cellWidth: 20 }
+      },
+    });
+
+    doc.save(
+      `delegation_report_all_${selectedEmp}_${new Date()
+        .toISOString()
+        .slice(0, 10)}.pdf`
+    );
+
+    toast.success("Delegation report downloaded");
+    setShowDownloadDropdown(false);
+  };
+
+  const downloadDelegationReportCompleted = () => {
+    if (!selectedEmp) {
+      toast.warn("Select employee first");
+      return;
+    }
+
+    const filtered = tasks.filter(
+      t => t.Status === "Completed" && t.Taskcompletedapproval !== "Approved"
+    );
+
+    if (filtered.length === 0) {
+      toast.info("No completed tasks to download");
+      return;
+    }
+
+    filtered.sort((a, b) => {
+      // 1️⃣ First sort by Name
+      const nameCompare = (a.Name || "").localeCompare(b.Name || "");
+      if (nameCompare !== 0) return nameCompare;
+
+      // 2️⃣ Then sort by Status for same Name
+      return (a.Status || "").localeCompare(b.Status || "");
+    });
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    doc.setFontSize(14);
+    doc.text(`Completed Tasks Report - ${selectedEmp}`, 14, 15);
+
+    autoTable(doc, {
+      head: [[
+        "Name",
+        "Task Name",
+        "Created Date",
+        "Deadline",
+        "Final Date",
+        "Revisions",
+        "Status"
+      ]],
+      body: filtered.map(t => [
+        t.Name || "",
+        t.TaskName || "",
+        t.CreatedDate || "--",
+        t.Deadline || "--",
+        t.FinalDate || "--",
+        t.Revisions || "--",
+        t.Status 
+      ]),
+      startY: 22,
+      theme: "grid",
+      styles: {
+        fontSize: 9,
+        cellPadding: 2,
+        overflow: "linebreak",
+      },
+      columnStyles: {
+        1: { cellWidth: 60 }, // Task Name column
+        0: { cellWidth: 20 }
+      },
+    });
+
+    doc.save(
+      `delegation_report_completed_${selectedEmp}_${new Date()
+        .toISOString()
+        .slice(0, 10)}.pdf`
+    );
+
+    toast.success("Completed tasks report downloaded");
+    setShowDownloadDropdown(false);
+  };
+
+  const downloadDelegationReportPending = () => {
+    if (!selectedEmp) {
+      toast.warn("Select employee first");
+      return;
+    }
+
+    const filtered = tasks.filter(
+      t => t.Status !== "Completed" && t.Taskcompletedapproval !== "Approved"
+    );
+
+    if (filtered.length === 0) {
+      toast.info("No pending tasks to download");
+      return;
+    }
+
+    filtered.sort((a, b) => {
+      // 1️⃣ First sort by Name
+      const nameCompare = (a.Name || "").localeCompare(b.Name || "");
+      if (nameCompare !== 0) return nameCompare;
+
+      // 2️⃣ Then sort by Status for same Name
+      return (a.Status || "").localeCompare(b.Status || "");
+    });
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    doc.setFontSize(14);
+    doc.text(`Pending Tasks Report - ${selectedEmp}`, 14, 15);
+
+    autoTable(doc, {
+      head: [[
+        "Name",
+        "Task Name",
+        "Created Date",
+        "Deadline",
+        "Final Date",
+        "Revisions",
+        "Status"
+      ]],
+      body: filtered.map(t => [
+        t.Name || "",
+        t.TaskName || "",
+        t.CreatedDate || "--",
+        t.Deadline || "--",
+        t.FinalDate || "--",
+        t.Revisions || "--",
+        t.Status 
+      ]),
+      startY: 22,
+      theme: "grid",
+      styles: {
+        fontSize: 9,
+        cellPadding: 2,
+        overflow: "linebreak",
+      },
+      columnStyles: {
+        1: { cellWidth: 60 }, // Task Name column
+        0: { cellWidth: 20 }
+      },
+    });
+
+    doc.save(
+      `delegation_report_pending_${selectedEmp}_${new Date()
+        .toISOString()
+        .slice(0, 10)}.pdf`
+    );
+
+    toast.success("Pending tasks report downloaded");
+    setShowDownloadDropdown(false);
+  };
+
+  const sendPendingDelegationWhatsApp = async () => {
+    if (!selectedEmp) {
+      toast.warn("Select employee first");
+      return;
+    }
+
+    try {
+      const pending = tasks.filter(
+        t =>
+          t.Deadline <= formatDateDDMMYYYYHHMMSS() &&
+          t.Status !== "Completed"
+      );
+
+      if (pending.length === 0) {
+        toast.info("No pending delegation tasks");
+        return;
+      }
+
+      // helper
+      const sendWA = async (empName, empNumber, empTasks) => {
+        if (!empNumber || empTasks.length === 0) return;
+
+        const payload = {
+          number: `91${empNumber}`,
+          employeeName: empName,
+          delegations: empTasks.map(t => t.TaskName) // ✅ ARRAY
+        };
+
+        console.log("WA Payload 👉", payload); // 🧪 DEBUG (important)
+
+        await axios.post(
+          "/whatsapp/send-delegation",   // ✅ CORRECT API
+          payload,
+          {
+            headers: { Authorization: `Bearer ${user.token}` }
+          }
+        );
+      };
+
+      // 🔹 ALL case
+      if (selectedEmp === "all") {
+        const map = {};
+
+        pending.forEach(t => {
+          if (!t.Name) return;
+          if (!map[t.Name]) map[t.Name] = [];
+          map[t.Name].push(t);
+        });
+
+        await Promise.all(
+          Object.keys(map).map(name => {
+            const emp = employees.find(e => e.name === name);
+            if (!emp?.number) return;
+            return sendWA(name, emp.number, map[name]);
+          })
+        );
+
+        toast.success("All employees ko delegation WhatsApp bhej diya 🚀");
+        return;
+      }
+
+      // 🔹 Single employee
+      const empTasks = pending.filter(t => t.Name === selectedEmp);
+      if (empTasks.length === 0) {
+        toast.info("No pending tasks");
+        return;
+      }
+
+      const emp = employees.find(e => e.name === selectedEmp);
+      if (!emp?.number) {
+        toast.warn("Employee WhatsApp number missing");
+        return;
+      }
+
+      await sendWA(selectedEmp, emp.number, empTasks);
+      toast.success("Delegation WhatsApp sent ✅");
+
+    } catch (err) {
+      console.error(err);
+      toast.error("WhatsApp send failed ❌");
+    }
+  };
+
+  const delegationFlowup = async () => {
+    try {
+      if (!selectedEmp) {
+        toast.warn("Select employee first");
+        return;
+      }
+
+      // 🔹 Pending tasks filter FIRST (no popup yet)
+      const pending = tasks.filter(
+        t =>
+          t.Deadline <= formatDateDDMMYYYYHHMMSS() &&
+          t.Status !== "Completed" &&
+          t.Name === selectedEmp
+      );
+
+      if (pending.length === 0) {
+        toast.info("No pending tasks");
+        return; // 🚫 NO WINDOW OPEN
+      }
+
+      const emp = employees.find(e => e.name === selectedEmp);
+      if (!emp?.number) {
+        toast.warn("Employee WhatsApp number missing");
+        return;
+      }
+
+      // 🔹 Beautiful numbered task list
+      const taskList = pending
+        .map((t, i) => `${i + 1}. ${t.TaskName}`)
+        .join("\n");
+
+      const message = encodeURIComponent(
 `Hi ${selectedEmp},
 
 👉 This is a gentle reminder regarding today’s pending & overdue tasks.
@@ -360,29 +416,26 @@ Kindly complete the tasks/shift the dates accordingly. ⏳📅
 ${taskList}
 
 Thanks`
-    );
+      );
 
-    // 🔥 OPEN WHATSAPP ONLY WHEN EVERYTHING IS READY
-    const whatsappWindow = window.open(
-      `https://wa.me/${emp.number}?text=${message}`,
-      "_blank"
-    );
+      // 🔥 OPEN WHATSAPP ONLY WHEN EVERYTHING IS READY
+      const whatsappWindow = window.open(
+        `https://wa.me/${emp.number}?text=${message}`,
+        "_blank"
+      );
 
-    if (!whatsappWindow) {
-      toast.error("Popup blocked. Allow popups for this site.");
-      return;
+      if (!whatsappWindow) {
+        toast.error("Popup blocked. Allow popups for this site.");
+        return;
+      }
+
+      toast.success("WhatsApp opened successfully ✅");
+
+    } catch (error) {
+      console.error(error);
+      toast.error("WhatsApp send failed ❌");
     }
-
-    toast.success("WhatsApp opened successfully ✅");
-
-  } catch (error) {
-    console.error(error);
-    toast.error("WhatsApp send failed ❌");
-  }
-};
-
-
-
+  };
 
   const normalizeDate = (date) => {
     if (!date) return "";
@@ -406,7 +459,8 @@ Thanks`
       toast.error("Failed to load employees");
     }
   };
-    const loadAdmin = async () => {
+  
+  const loadAdmin = async () => {
     try {
       const res = await axios.get("/employee/allAdmin", {
         headers: { Authorization: `Bearer ${user.token}` },
@@ -418,81 +472,49 @@ Thanks`
     }
   };
 
-  // const loadUserTasks = async (name) => {
-  //   if (!name) return;
-  //   setLoading(true);
-  //   try {
-  //     const res = await axios.get(
-  //       `/delegations/search/by-name?name=${encodeURIComponent(name)}`,
-  //       { headers: { Authorization: `Bearer ${user.token}` } }
-  //     );
-
-  //     const formattedTasks = res.data.map((t) => ({
-  //       ...t,
-  //       CreatedDate: t.CreatedDate,
-  //       Deadline: t.Deadline,
-  //       FinalDate: t.FinalDate,
-  //     }));
-
-  //     setTasks(formattedTasks);
-  //   } catch (err) {
-  //     console.error(err);
-  //     toast.error("Failed to load tasks");
-  //     setTasks([]);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
   const loadUserTasks = async (name, assignByValue) => {
-  if (!name) return;
-  setLoading(true);
-  try {
-    let url = `/delegations/search/by-name?name=${encodeURIComponent(name)}`;
+    if (!name) return;
+    setLoading(true);
+    try {
+      let url = `/delegations/search/by-name?name=${encodeURIComponent(name)}`;
 
-    if (assignByValue && assignByValue !== "all") {
-      url += `&assignBy=${encodeURIComponent(assignByValue)}`;
+      if (assignByValue && assignByValue !== "all") {
+        url += `&assignBy=${encodeURIComponent(assignByValue)}`;
+      }
+
+      const res = await axios.get(url, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+
+      const formattedTasks = res.data.map((t) => ({
+        ...t,
+        CreatedDate: t.CreatedDate,
+        Deadline: t.Deadline,
+        FinalDate: t.FinalDate,
+      }));
+
+      setTasks(formattedTasks);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load tasks");
+      setTasks([]);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const res = await axios.get(url, {
-      headers: { Authorization: `Bearer ${user.token}` },
-    });
-
-    const formattedTasks = res.data.map((t) => ({
-      ...t,
-      CreatedDate: t.CreatedDate,
-      Deadline: t.Deadline,
-      FinalDate: t.FinalDate,
-    }));
-
-    setTasks(formattedTasks);
-  } catch (err) {
-    console.error(err);
-    toast.error("Failed to load tasks");
-    setTasks([]);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  
   useEffect(() => {
     if (user) {
-      loadEmployees()
-      loadAdmin()
-    };
+      loadEmployees();
+      loadAdmin();
+    }
   }, [user]);
 
-  // useEffect(() => {
-  //   if (selectedEmp) loadUserTasks(selectedEmp);
-  // }, [selectedEmp]);
-
   useEffect(() => {
-  if (selectedEmp) {
-    loadUserTasks(selectedEmp, assignBy);
-  }
-}, [selectedEmp, assignBy]);
-
+    if (selectedEmp) {
+      loadUserTasks(selectedEmp, assignBy);
+    }
+  }, [selectedEmp, assignBy]);
 
   const createTask = async () => {
     if (!selectedEmp) {
@@ -516,39 +538,36 @@ Thanks`
         headers: { Authorization: `Bearer ${user.token}` },
       });
       console.log("tsting: ", res);
-      if(res.data.ok === true){
-     
-  loadUserTasks();
-      setTasks([
-        {
-          TaskID: res.data.TaskID,
-          Name: selectedEmp,
-          TaskName: form.TaskName,
-          Deadline: normalizeDate(form.Deadline),
-          CreatedDate: formatDateDDMMYYYYHHMMSS(),
-          Revision1: "",
-          Revision2: "",
-          FinalDate: "",
-          Revisions: 0,
-          Priority: form.Priority,
-          Status: "Pending",
-          AssignBy: assignBy,
-          Taskcompletedapproval: "Pending",
-        },
-        ...tasks,
-      ]);
+      if (res.data.ok === true) {
+        loadUserTasks();
+        setTasks([
+          {
+            TaskID: res.data.TaskID,
+            Name: selectedEmp,
+            TaskName: form.TaskName,
+            Deadline: normalizeDate(form.Deadline),
+            CreatedDate: formatDateDDMMYYYYHHMMSS(),
+            Revision1: "",
+            Revision2: "",
+            FinalDate: "",
+            Revisions: 0,
+            Priority: form.Priority,
+            Status: "Pending",
+            AssignBy: assignBy,
+            Taskcompletedapproval: "Pending",
+          },
+          ...tasks,
+        ]);
 
-      setForm({ TaskName: "", Deadline: "", Priority: "", Notes: "" });
-      setShowCreate(false);
-      toast.success("Task created successfully");
-}else{
-   toast.error("Failed to create task Technical Issue Please Re Create");
-}
-
-  
+        setForm({ TaskName: "", Deadline: "", Priority: "", Notes: "" });
+        setShowCreate(false);
+        toast.success("Task created successfully");
+      } else {
+        toast.error("Failed to create task Technical Issue Please Re Create");
+      }
     } catch (err) {
       console.error(err);
-      toast.error(err.response.data.error || "Failed to create task");
+      toast.error(err.response?.data?.error || "Failed to create task");
     } finally {
       setLoadingTaskId(null);
     }
@@ -623,8 +642,6 @@ Thanks`
     }
   };
 
-  
-
   const handleApprovalChange = async (taskID, value) => {
     setLoadingApprovalId(taskID);
     try {
@@ -652,50 +669,51 @@ Thanks`
       setLoadingApprovalId(null);
     }
   };
-const editTaskDetails = (task) => {
-  setEditTask(task);
-  setForm({
-    TaskName: task.TaskName,
-    Deadline: task.Deadline, // sirf show ke liye, edit nahi hoga
-    Priority: task.Priority,
-    Notes: task.Followup,
-  });
-};
-const updateTask = async () => {
-  if (!form.TaskName) {
-    toast.warn("Task Name is required");
-    return;
-  }
-
-  setLoadingTaskId("update");
-  try {
-    const payload = {
-      TaskName: form.TaskName, // ✅ ONLY NAME
-    };
-
-    await axios.put(`/delegations/update/${editTask.TaskID}`, payload, {
-      headers: { Authorization: `Bearer ${user.token}` },
+  
+  const editTaskDetails = (task) => {
+    setEditTask(task);
+    setForm({
+      TaskName: task.TaskName,
+      Deadline: task.Deadline, // sirf show ke liye, edit nahi hoga
+      Priority: task.Priority,
+      Notes: task.Followup,
     });
+  };
+  
+  const updateTask = async () => {
+    if (!form.TaskName) {
+      toast.warn("Task Name is required");
+      return;
+    }
 
-    setTasks(
-      tasks.map((t) =>
-        t.TaskID === editTask.TaskID
-          ? { ...t, TaskName: form.TaskName }
-          : t
-      )
-    );
+    setLoadingTaskId("update");
+    try {
+      const payload = {
+        TaskName: form.TaskName, // ✅ ONLY NAME
+      };
 
-    setEditTask(null);
-    setForm({ TaskName: "", Deadline: "", Priority: "", Notes: "" });
-    toast.success("Task updated successfully");
-  } catch (err) {
-    console.error(err);
-    toast.error("Failed to update task");
-  } finally {
-    setLoadingTaskId(null);
-  }
-};
+      await axios.put(`/delegations/update/${editTask.TaskID}`, payload, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
 
+      setTasks(
+        tasks.map((t) =>
+          t.TaskID === editTask.TaskID
+            ? { ...t, TaskName: form.TaskName }
+            : t
+        )
+      );
+
+      setEditTask(null);
+      setForm({ TaskName: "", Deadline: "", Priority: "", Notes: "" });
+      toast.success("Task updated successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update task");
+    } finally {
+      setLoadingTaskId(null);
+    }
+  };
 
   const deleteTask = async (taskID) => {
     setLoadingTaskId(taskID);
@@ -747,73 +765,70 @@ const updateTask = async () => {
   return (
     <div className="p-4 max-w-4xl mx-auto">
       {/* Employee Select */}
-   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-  {/* Select Employee */}
-  <div>
-    <label className="block mb-1 text-sm font-medium text-gray-700">
-      Select Employee
-    </label>
-    <select
-      className="w-full h-11 rounded-md border border-gray-300 bg-white px-3 text-sm
-                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
-                 hover:border-gray-400 transition"
-      value={selectedEmp}
-      onChange={(e) => setSelectedEmp(e.target.value)}
-    >
-      <option value="">-- Select Employee --</option>
-      <option value="all">All Delegation</option>
-      {employees
-        .sort((a, b) =>
-          a.name.toLowerCase().localeCompare(b.name.toLowerCase())
-        )
-        .map((emp) => (
-          <option key={emp.name} value={emp.name}>
-            {emp.name}
-          </option>
-        ))}
-    </select>
-  </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {/* Select Employee */}
+        <div>
+          <label className="block mb-1 text-sm font-medium text-gray-700">
+            Select Employee
+          </label>
+          <select
+            className="w-full h-11 rounded-md border border-gray-300 bg-white px-3 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
+                       hover:border-gray-400 transition"
+            value={selectedEmp}
+            onChange={(e) => setSelectedEmp(e.target.value)}
+          >
+            <option value="">-- Select Employee --</option>
+            <option value="all">All Delegation</option>
+            {employees
+              .sort((a, b) =>
+                a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+              )
+              .map((emp) => (
+                <option key={emp.name} value={emp.name}>
+                  {emp.name}
+                </option>
+              ))}
+          </select>
+        </div>
 
-  {/* Assign By */}
-  <div>
-    <label className="block mb-1 text-sm font-medium text-gray-700">
-      Assign By
-    </label>
-<select
-  className="w-full rounded-md border border-gray-300 bg-white
-             px-3 py-2 text-sm
-             focus:outline-none focus:ring-2 focus:ring-emerald-500
-             hover:border-gray-400 transition"
-  value={assignBy}
-  onChange={(e) => setAssignBy(e.target.value)}
->
-  {/* Placeholder – dropdown me nahi dikhega */}
-  <option value="" disabled hidden>
-    -- Select Assign By --
-  </option>
+        {/* Assign By */}
+        <div>
+          <label className="block mb-1 text-sm font-medium text-gray-700">
+            Assign By
+          </label>
+          <select
+            className="w-full rounded-md border border-gray-300 bg-white
+                       px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-emerald-500
+                       hover:border-gray-400 transition"
+            value={assignBy}
+            onChange={(e) => setAssignBy(e.target.value)}
+          >
+            {/* Placeholder – dropdown me nahi dikhega */}
+            <option value="" disabled hidden>
+              -- Select Assign By --
+            </option>
 
-  {admin
-    .filter(emp => typeof emp?.name === "string" && emp.name.trim() !== "")   // safety
-    .sort((a, b) =>
-      a.name.toLowerCase().localeCompare(b.name.toLowerCase())
-    )
-    .map((emp) => (
-      <option key={emp.name} value={emp.name}>
-        {emp.name}
-      </option>
-    ))}
+            {admin
+              .filter(emp => typeof emp?.name === "string" && emp.name.trim() !== "")   // safety
+              .sort((a, b) =>
+                a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+              )
+              .map((emp) => (
+                <option key={emp.name} value={emp.name}>
+                  {emp.name}
+                </option>
+              ))}
 
-  <option value="all">All Assign</option>
-</select>
+            <option value="all">All Assign</option>
+          </select>
+        </div>
+      </div>
 
-  </div>
-</div>
-
-
-
-      {/* Create Task And Download  Button */}
+      {/* Create Task And Download Buttons */}
       {selectedEmp && (
-        <div className="mb-6 flex gap-3">
+        <div className="mb-6 flex gap-3 flex-wrap">
           <button
             className="bg-blue-600 text-white px-4 py-2 rounded"
             onClick={() => setShowCreate(!showCreate)}
@@ -821,22 +836,45 @@ const updateTask = async () => {
             {showCreate ? "Cancel" : "Create Task"}
           </button>
 
-       <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={downloadDelegationReport}>
-            Download Pending Completed Report
-          </button>
+          {/* Download Dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              className="bg-gray-700 text-white px-4 py-2 rounded flex items-center gap-2"
+              onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+            >
+              Download Reports
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {showDownloadDropdown && (
+              <div className="absolute left-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 border">
+                <button
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  onClick={downloadDelegationReport}
+                >
+                  📄 All Tasks (Pending & Completed)
+                </button>
+                <button
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  onClick={downloadDelegationReportPending}
+                >
+                  ⏳ Only Pending Tasks
+                </button>
+                <button
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  onClick={downloadDelegationReportCompleted}
+                >
+                  ✅ Only Completed Tasks
+                </button>
+              </div>
+            )}
+          </div>
 
-           <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={downloadDelegationReportCompletd}>
-            Download Completed Report
-          </button>
-
-<button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={delegationFlowup}>
+          <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={delegationFlowup}>
             Pending Delegation Whatsapp Flowup
           </button>
-
-           {/* <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={sendPendingDelegationWhatsApp}> */}
-            {/* Pending Task Flowup  */}
-          {/* </button> */}
-
         </div>
       )}
 
@@ -887,7 +925,7 @@ const updateTask = async () => {
       {!loading && selectedEmp && (
         <>
           {/* Tabs */}
-          <div className="flex gap-3 mb-6">
+          <div className="flex gap-3 mb-6 flex-wrap">
             <button
               className={`px-3 py-2 rounded ${
                 activeTab === "pending" ? "bg-blue-600 text-white" : "bg-gray-300"
@@ -896,7 +934,7 @@ const updateTask = async () => {
             >
               Pending / Shifted
             </button>
-                <button
+            <button
               className={`px-3 py-2 rounded ${
                 activeTab === "Today_Followup" ? "bg-purple-600 text-white" : "bg-gray-300"
               }`}
@@ -920,7 +958,6 @@ const updateTask = async () => {
             >
               Approved
             </button>
-        
           </div>
 
           {/* Task List */}
@@ -934,7 +971,7 @@ const updateTask = async () => {
                       Created: {task.CreatedDate || "—"}, <span/><span/>
                       Deadline: {task.Deadline || "—"}, <span />
                       Completed: {task.FinalDate || "—"}, <span />
-                      Revision: {task.Revisions || "0"},<span /><span/>
+                      Revision: {task.Revisions || "0"},<span/><span/>
                       Name: {task.Name || "_"}
                     </div>
                   </div>
@@ -958,30 +995,6 @@ const updateTask = async () => {
                   >
                     Edit
                   </button>
-                  {/* <button
-                    onClick={() => setDeleteTaskId(task.TaskID)}
-                    className="bg-red-600 text-white px-4 py-2 rounded"
-                  >
-                    Delete
-                  </button> */}
-                  {activeTab === "pending" && task.Status !== "Completed" && (
-                    <>
-                      {/* <button
-                        onClick={() => handleDone(task.TaskID)}
-                        className="bg-green-600 text-white px-3 py-1 rounded"
-                        disabled={loadingTaskId === task.TaskID}
-                      >
-                        {loadingTaskId === task.TaskID ? "Processing..." : "Mark Done"}
-                      </button>
-                      <button
-                        onClick={() => openShiftPicker(task)}
-                        className="bg-yellow-600 text-white px-3 py-1 rounded"
-                        disabled={task.Revisions >= 2}
-                      >
-                        {task.Revisions >= 2 ? "Max Shifts Reached" : "Shift Deadline"}
-                      </button> */}
-                    </>
-                  )}
                 </div>
 
                 {activeTab === "completed" && task.Status === "Completed" && (
@@ -989,17 +1002,14 @@ const updateTask = async () => {
                     <label className="text-sm font-medium mr-2">Approval:</label>
                     <select
                       className="border p-1 rounded"
-                      value={""}
+                      value={task.Taskcompletedapproval || ""}
                       onChange={(e) =>
                         handleApprovalChange(task.TaskID, e.target.value)
                       }
                       disabled={loadingApprovalId === task.TaskID}
                     >
-                      <option value="" disabled>
-                        Select
-                      </option>
+                      <option value="">Select</option>
                       <option value="Approved">Approved</option>
-                      {/* <option value="NotApproved">NotApproved</option> */}
                       <option value="Pending">Pending</option>
                     </select>
                     {loadingApprovalId === task.TaskID ? "Processing..." : ""}
@@ -1010,42 +1020,43 @@ const updateTask = async () => {
           </div>
         </>
       )}
-{editTask && (
-  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded shadow w-full max-w-md">
-      <h2 className="text-lg font-semibold mb-4">Edit Task Name</h2>
+      
+      {editTask && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow w-full max-w-md">
+            <h2 className="text-lg font-semibold mb-4">Edit Task Name</h2>
 
-      <label className="block text-sm font-semibold mb-2">
-        Task Name
-      </label>
-      <input
-        type="text"
-        className="w-full border p-2 rounded mb-4"
-        value={form.TaskName}
-        onChange={(e) =>
-          setForm({ ...form, TaskName: e.target.value })
-        }
-      />
+            <label className="block text-sm font-semibold mb-2">
+              Task Name
+            </label>
+            <input
+              type="text"
+              className="w-full border p-2 rounded mb-4"
+              value={form.TaskName}
+              onChange={(e) =>
+                setForm({ ...form, TaskName: e.target.value })
+              }
+            />
 
-      <div className="flex justify-end gap-3">
-        <button
-          className="px-4 py-2 bg-gray-400 text-white rounded"
-          onClick={() => setEditTask(null)}
-        >
-          Cancel
-        </button>
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 bg-gray-400 text-white rounded"
+                onClick={() => setEditTask(null)}
+              >
+                Cancel
+              </button>
 
-        <button
-          className="px-4 py-2 bg-green-600 text-white rounded"
-          onClick={updateTask}
-          disabled={loadingTaskId === "update"}
-        >
-          {loadingTaskId === "update" ? "Updating..." : "Update"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+              <button
+                className="px-4 py-2 bg-green-600 text-white rounded"
+                onClick={updateTask}
+                disabled={loadingTaskId === "update"}
+              >
+                {loadingTaskId === "update" ? "Updating..." : "Update"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Container */}
       <ToastContainer
