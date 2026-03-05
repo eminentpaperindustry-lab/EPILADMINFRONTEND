@@ -796,7 +796,7 @@ export default function Topbar() {
               const alertMessages = [
                 "🔄 Refresh the portal before adding a task",
                 "⚠️ If issues continue, log out/in or raise a support ticket",
-                "📢 System Update: Regular maintenance every Sunday 2 AM - 4 AM",
+                "📢 System Update: Regular maintenance",
                 "🔄 Refresh the portal before adding a task",
               ];
               // Duplicate content for seamless scroll
