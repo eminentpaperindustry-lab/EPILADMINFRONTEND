@@ -546,7 +546,12 @@ export default function SupportTicket() {
             {allTicketsLoading && <div className="text-center py-6">Loading tickets...</div>}
 
             {!allTicketsLoading &&
-              tickets.map((t) => {
+              tickets
+    .filter((ticket, index, self) => 
+      index === self.findIndex(t => t.Issue === ticket.Issue)
+    )
+    .map((t) => {
+      const sameIssueCount = tickets.filter(t2 => t2.Issue === t.Issue).length;
                 const date = dayjs(t.CreatedDate, DATE_FORMAT);
                 return (
                   <div
