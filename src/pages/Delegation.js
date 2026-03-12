@@ -1002,7 +1002,7 @@ Thanks`
                     <label className="text-sm font-medium mr-2">Approval:</label>
                     <select
                       className="border p-1 rounded"
-                      value={task.Taskcompletedapproval || ""}
+                      value={task.Taskcompletedapproval==="Pending"?"":task.Taskcompletedapproval || ""}
                       onChange={(e) =>
                         handleApprovalChange(task.TaskID, e.target.value)
                       }

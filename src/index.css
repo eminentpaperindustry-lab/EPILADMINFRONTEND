@@ -39,3 +39,6 @@
   animation: fadeIn 0.2s ease-in-out;
 }
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

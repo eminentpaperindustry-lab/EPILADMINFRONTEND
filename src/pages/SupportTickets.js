@@ -1,358 +1,11 @@
-// import React, { useEffect, useState, useContext, useRef } from "react";
-// import axios from "../api/axios";
-// import { AuthContext } from "../context/AuthContext";
-// import dayjs from "dayjs";
-// import relativeTime from "dayjs/plugin/relativeTime";
-// import customParseFormat from "dayjs/plugin/customParseFormat";
-
-// dayjs.extend(relativeTime);
-// dayjs.extend(customParseFormat);
-
-// const DATE_FORMAT = "DD/MM/YYYY HH:mm:ss";
-
-// export default function SupportTicket() {
-//   const { user } = useContext(AuthContext);
-//   const fileInputRef = useRef();
-
-//   /* ================= STATES ================= */
-//   const [activeMainTab, setActiveMainTab] = useState("all");
-//   const [statusFilter, setStatusFilter] = useState("");
-//   const [tickets, setTickets] = useState([]);
-//   const [createdTickets, setCreatedTickets] = useState([]);
-//   const [employees, setEmployees] = useState([]);
-
-//   const [loading, setLoading] = useState(false);
-//   const [creating, setCreating] = useState(false);
-//   const [updating, setUpdating] = useState(null);
-//   const [modalImage, setModalImage] = useState(null);
-
-//   const [form, setForm] = useState({
-//     AssignedTo: "",
-//     Issue: "",
-//     IssuePhoto: null,
-//   });
-
-//   const authHeader = {
-//     headers: { Authorization: `Bearer ${user.token}` },
-//   };
-
-//   /* ================= LOADERS ================= */
-//   const loadAllTickets = async (status = "") => {
-//     setLoading(true);
-//     try {
-//       const res = await axios.get("/support-tickets/all", {
-//         ...authHeader,
-//         params: status ? { status } : {},
-//       });
-//       setTickets(res.data.tickets || []);
-//     } catch (err) {
-//       console.error(err);
-//     }
-//     setLoading(false);
-//   };
-
-//   const loadCreatedTickets = async () => {
-//     try {
-//       const res = await axios.get("/support-tickets/created", authHeader);
-//       setCreatedTickets((res.data || []).filter((t) => t.Status !== "Done"));
-//     } catch (err) {
-//       console.error(err);
-//     }
-//   };
-
-//   const loadEmployees = async () => {
-//     try {
-//       const res = await axios.get("/employee/all", authHeader);
-//       setEmployees((res.data || []).filter((e) => e.name !== user.name));
-//     } catch (err) {
-//       console.error(err);
-//     }
-//   };
-
-//   useEffect(() => {
-//     loadAllTickets("");
-//     loadEmployees();
-//   }, []);
-
-//   useEffect(() => {
-//     loadAllTickets(statusFilter);
-//   }, [statusFilter]);
-
-//   useEffect(() => {
-//     if (activeMainTab === "create") {
-//       loadCreatedTickets();
-//     }
-//   }, [activeMainTab]);
-
-//   /* ================= ACTIONS ================= */
-//   const handleFileChange = (e) => {
-//     setForm((prev) => ({ ...prev, IssuePhoto: e.target.files[0] }));
-//   };
-
-//   const createTicket = async () => {
-//     if (!form.AssignedTo || !form.Issue) {
-//       return alert("All fields required");
-//     }
-
-//     setCreating(true);
-//     try {
-//       const formData = new FormData();
-//       formData.append("AssignedTo", form.AssignedTo);
-//       formData.append("Issue", form.Issue);
-//       if (form.IssuePhoto) formData.append("IssuePhoto", form.IssuePhoto);
-
-//       // ✅ Create ticket
-//       await axios.post("/support-tickets/create", formData, {
-//         headers: {
-//           ...authHeader.headers,
-//           "Content-Type": "multipart/form-data",
-//         },
-//       });
-
-//       // Reset form
-    
-
-//       // ✅ Refresh created tickets
-//       await loadCreatedTickets();
-//         setForm({ AssignedTo: "", Issue: "", IssuePhoto: null });
-//       if (fileInputRef.current) fileInputRef.current.value = null;
-
-//     } catch (err) {
-//       console.error(err);
-//       alert("Failed to create ticket");
-//     }
-//     setCreating(false);
-//   };
-
-//   const markDone = async (id) => {
-//     setUpdating(id);
-//     try {
-//       await axios.patch(
-//         `/support-tickets/status/${id}`,
-//         { Status: "Done" },
-//         authHeader
-//       );
-//       // ✅ Refresh after marking done
-//       await loadCreatedTickets();
-//     } catch {
-//       alert("Failed to update");
-//     }
-//     setUpdating(null);
-//   };
-
-//   /* ================= UI ================= */
-//   return (
-//     <div className="p-6 h-full flex flex-col">
-//       <h2 className="text-2xl font-semibold mb-4">Support Tickets</h2>
-
-//       {/* MAIN TABS */}
-//       <div className="flex gap-4 mb-6">
-//         <button
-//           onClick={() => setActiveMainTab("all")}
-//           className={`px-4 py-2 rounded ${
-//             activeMainTab === "all" ? "bg-blue-600 text-white" : "bg-gray-200"
-//           }`}
-//         >
-//           All Support Tickets
-//         </button>
-
-//         <button
-//           onClick={() => setActiveMainTab("create")}
-//           className={`px-4 py-2 rounded ${
-//             activeMainTab === "create"
-//               ? "bg-blue-600 text-white"
-//               : "bg-gray-200"
-//           }`}
-//         >
-//           Create Support Ticket
-//         </button>
-//       </div>
-
-//       {/* ================= ALL TICKETS ================= */}
-//       {activeMainTab === "all" && (
-//         <>
-//           <div className="bg-white p-4 rounded shadow mb-4 flex gap-2">
-//             {[
-//               { label: "All", value: "" },
-//               { label: "Pending", value: "Pending" },
-//               { label: "In Progress", value: "InProgress" },
-//               { label: "Done", value: "Done" },
-//             ].map((tab) => (
-//               <button
-//                 key={tab.value}
-//                 onClick={() => setStatusFilter(tab.value)}
-//                 className={`px-4 py-2 rounded ${
-//                   statusFilter === tab.value
-//                     ? "bg-blue-600 text-white"
-//                     : "bg-gray-200"
-//                 }`}
-//               >
-//                 {tab.label}
-//               </button>
-//             ))}
-//           </div>
-
-//           <div className="flex-1 overflow-y-auto pr-2">
-//             {loading && <div className="text-center py-6">Loading...</div>}
-
-//             {!loading &&
-//               tickets.map((t) => {
-//                 const date = dayjs(t.CreatedDate, DATE_FORMAT);
-//                 return (
-//                   <div
-//                     key={t.TicketID}
-//                     className="bg-white p-4 rounded shadow mb-4 flex justify-between"
-//                   >
-//                     <div>
-//                       <div className="font-semibold">{t.Issue}</div>
-//                       <div className="text-sm">Created By: {t.CreatedBy}</div>
-//                       <div className="text-sm">Assigned To: {t.AssignedTo}</div>
-//                       <div className="text-sm text-gray-500">
-//                         {date.fromNow()}
-//                       </div>
-//                     </div>
-
-//                     <div className="flex items-center gap-2">
-//                       {t.IssuePhoto && (
-//                         <button
-//                           onClick={() => setModalImage(t.IssuePhoto)}
-//                           className="bg-gray-700 text-white px-3 py-1 rounded"
-//                         >
-//                           View Image
-//                         </button>
-//                       )}
-//                       <span className="px-3 py-1 rounded bg-blue-600 text-white">
-//                         {t.Status}
-//                       </span>
-//                     </div>
-//                   </div>
-//                 );
-//               })}
-//           </div>
-//         </>
-//       )}
-
-//       {/* ================= CREATE TAB ================= */}
-//       {activeMainTab === "create" && (
-//         <>
-//           <div className="bg-white p-6 rounded shadow mb-6">
-//             <h3 className="text-xl font-semibold mb-4">Create Ticket</h3>
-
-//             <select
-//               className="w-full border p-2 rounded mb-3"
-//               value={form.AssignedTo}
-//               onChange={(e) =>
-//                 setForm({ ...form, AssignedTo: e.target.value })
-//               }
-//             >
-//               <option value="">Select Employee</option>
-//               <option value={"Sagar Soni"}>{"SAGAR SONI"}</option>
-//               <option value={"Devyani Bhatt"}>{"Devyani Bhatt"}</option>
-//               <option value={"Govind Vora"}>{"Govind Vora"}</option>
-//               <option value={"Mohammad Sami "}>{"Mohammad Sami "}</option>
-//             </select>
-
-//             <textarea
-//               className="w-full border p-2 rounded mb-3"
-//               placeholder="Issue"
-//               value={form.Issue}
-//               onChange={(e) => setForm({ ...form, Issue: e.target.value })}
-//             />
-
-//             <input
-//               ref={fileInputRef}
-//               type="file"
-//               accept="image/*"
-//               onChange={handleFileChange}
-//               className="mb-3"
-//             />
-
-//             {form.IssuePhoto && (
-//               <img
-//                 src={URL.createObjectURL(form.IssuePhoto)}
-//                 alt="preview"
-//                 className="w-32 h-32 object-cover mb-3 border rounded"
-//               />
-//             )}
-
-//             <button
-//               disabled={creating}
-//               onClick={createTicket}
-//               className="bg-green-600 text-white px-6 py-2 rounded"
-//             >
-//               {creating ? "Creating..." : "Create Ticket"}
-//             </button>
-//           </div>
-
-//           <h3 className="text-xl font-semibold mb-3">Created Tickets</h3>
-
-//           {createdTickets.length === 0 && (
-//             <div className="text-gray-500">No pending tickets</div>
-//           )}
-
-//           {createdTickets.map((t) => (
-//             <div
-//               key={t.TicketID}
-//               className="bg-white p-4 rounded shadow mb-3 flex justify-between items-center"
-//             >
-//               <div>
-//                 <div className="font-medium">{t.Issue}</div>
-//                 <div className="text-sm text-gray-500">
-//                   {dayjs(t.CreatedDate, DATE_FORMAT).fromNow()}
-//                 </div>
-//               </div>
-
-//               <div className="flex items-center gap-2">
-//                 {t.IssuePhoto && (
-//                   <button
-//                     onClick={() => setModalImage(t.IssuePhoto)}
-//                     className="bg-gray-700 text-white px-3 py-1 rounded"
-//                   >
-//                     View Image
-//                   </button>
-//                 )}
-
-//                 <button
-//                   disabled={updating === t.TicketID}
-//                   onClick={() => markDone(t.TicketID)}
-//                   className="bg-green-600 text-white px-3 py-1 rounded"
-//                 >
-//                   {updating === t.TicketID ? "Updating..." : "Mark Done"}
-//                 </button>
-//               </div>
-//             </div>
-//           ))}
-//         </>
-//       )}
-
-//       {/* IMAGE MODAL */}
-//       {modalImage && (
-//         <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-//           <div className="relative">
-//             <button
-//               onClick={() => setModalImage(null)}
-//               className="absolute top-2 right-2 bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold hover:bg-red-700"
-//             >
-//               ×
-//             </button>
-//             <img
-//               src={modalImage}
-//               alt="Issue"
-//               className="max-w-[90vw] max-h-[90vh] rounded shadow-lg object-contain"
-//             />
-//           </div>
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
 import React, { useEffect, useState, useContext, useRef } from "react";
 import axios from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import customParseFormat from "dayjs/plugin/customParseFormat";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 dayjs.extend(relativeTime);
 dayjs.extend(customParseFormat);
@@ -365,19 +18,26 @@ export default function SupportTicket() {
 
   /* ================= STATES ================= */
   const [activeMainTab, setActiveMainTab] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("");
   const [tickets, setTickets] = useState([]);
   const [createdTickets, setCreatedTickets] = useState([]);
   const [employees, setEmployees] = useState([]);
+  
+  // Tab states for All view
+  const [allTab, setAllTab] = useState("pending");
+  
+  // Tab states for Created view
+  const [createdTab, setCreatedTab] = useState("pending");
 
   const [allTicketsLoading, setAllTicketsLoading] = useState(false);
   const [createdTicketsLoading, setCreatedTicketsLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [updating, setUpdating] = useState(null);
+  const [updating, setUpdating] = useState({});
   const [modalImage, setModalImage] = useState(null);
+  const [userDept, setUserDept] = useState("");
+  const [showDropdown, setShowDropdown] = useState({});
+  const [actionLoading, setActionLoading] = useState({});
 
   const [form, setForm] = useState({
-    AssignedTo: "",
     Issue: "",
     IssuePhoto: null,
   });
@@ -387,16 +47,26 @@ export default function SupportTicket() {
   };
 
   /* ================= LOADERS ================= */
-  const loadAllTickets = async (status = "") => {
+  const loadUserDepartment = async () => {
+    try {
+      const res = await axios.get("/employee/all", authHeader);
+      const currentUser = (res.data || []).find(e => e.name === user.name);
+      setUserDept(currentUser?.department || "");
+      console.log("User Department:", currentUser?.department);
+    } catch (err) {
+      console.error("Failed to load user department:", err);
+      toast.error("Failed to load user department");
+    }
+  };
+
+  const loadAllTickets = async () => {
     setAllTicketsLoading(true);
     try {
-      const res = await axios.get("/support-tickets/all", {
-        ...authHeader,
-        params: status ? { status } : {},
-      });
+      const res = await axios.get("/support-tickets/all", authHeader);
       setTickets(res.data.tickets || []);
     } catch (err) {
       console.error(err);
+      toast.error("Failed to load tickets");
     }
     setAllTicketsLoading(false);
   };
@@ -405,9 +75,10 @@ export default function SupportTicket() {
     setCreatedTicketsLoading(true);
     try {
       const res = await axios.get("/support-tickets/created", authHeader);
-      setCreatedTickets((res.data || []).filter((t) => t.Status !== "Done"));
+      setCreatedTickets(res.data || []);
     } catch (err) {
       console.error(err);
+      toast.error("Failed to load created tickets");
     }
     setCreatedTicketsLoading(false);
   };
@@ -422,13 +93,10 @@ export default function SupportTicket() {
   };
 
   useEffect(() => {
-    loadAllTickets("");
+    loadUserDepartment();
+    loadAllTickets();
     loadEmployees();
   }, []);
-
-  useEffect(() => {
-    loadAllTickets(statusFilter);
-  }, [statusFilter]);
 
   useEffect(() => {
     if (activeMainTab === "create") {
@@ -442,26 +110,21 @@ export default function SupportTicket() {
   };
 
   const createTicket = async () => {
-    if (!form.Issue) return alert("All fields required");
+    if (!form.Issue) {
+      toast.error("Issue description is required");
+      return;
+    }
 
     setCreating(true);
-    const tempTicket = {
-      TicketID: "temp-" + Date.now(),
-      Issue: form.Issue,
-      CreatedDate: dayjs().format(DATE_FORMAT),
-      IssuePhoto: form.IssuePhoto ? URL.createObjectURL(form.IssuePhoto) : null,
-      Status: "Pending",
-    };
-    setCreatedTickets((prev) => [tempTicket, ...prev]);
+    const toastId = toast.loading("Creating ticket...");
 
     try {
       const formData = new FormData();
-      // formData.append("AssignedTo", form.AssignedTo);
       formData.append("Issue", form.Issue);
       if (form.IssuePhoto) formData.append("IssuePhoto", form.IssuePhoto);
 
       // Clear form
-      setForm({ AssignedTo: "", Issue: "", IssuePhoto: null });
+      setForm({ Issue: "", IssuePhoto: null });
       if (fileInputRef.current) fileInputRef.current.value = null;
 
       await axios.post("/support-tickets/create", formData, {
@@ -472,115 +135,504 @@ export default function SupportTicket() {
       });
 
       await loadCreatedTickets();
+      
+      toast.update(toastId, {
+        render: "Ticket created successfully!",
+        type: "success",
+        isLoading: false,
+        autoClose: 3000
+      });
     } catch (err) {
-      alert("Failed to create ticket");
       console.error(err);
-      setCreatedTickets((prev) => prev.filter((t) => !t.TicketID.startsWith("temp-")));
+      toast.update(toastId, {
+        render: err.response?.data?.error || "Failed to create ticket",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000
+      });
     }
 
     setCreating(false);
   };
 
-  const markDone = async (id) => {
-      const cleanId = encodeURIComponent(id.trim());
+  const updateStatus = async (id, status) => {
+    setUpdating((p) => ({ ...p, [id]: true }));
+    
+    let actionText = "";
+    if (status === "InProgress") actionText = "Starting";
+    else if (status === "Done") actionText = "Completing";
+    else if (status === "Approved") actionText = "Approving";
+    else if (status === "Pending") actionText = "Rejecting";
+    
+    const toastId = toast.loading(`${actionText} ticket...`);
 
-    setUpdating(id);
     try {
-      await axios.patch(
-        `/support-tickets/status/${cleanId}`,
-        { Status: "Done" },
+      const cleanId = encodeURIComponent(id.trim());
+      console.log(`Updating ticket ${id} to status: ${status}`);
+      
+      const response = await axios.patch(
+        `/support-tickets/status/${cleanId}`, 
+        { Status: status }, 
         authHeader
       );
-      // ✅ Refresh after marking done
-      await loadCreatedTickets();
-    } catch {
-      alert("Failed to update");
+      
+      console.log("Update response:", response.data);
+      
+      // Refresh both ticket lists
+      await Promise.all([
+        loadAllTickets(),
+        loadCreatedTickets()
+      ]);
+      
+      setShowDropdown((p) => ({ ...p, [id]: false }));
+      
+      let successMsg = "";
+      if (status === "InProgress") successMsg = "Ticket started successfully!";
+      else if (status === "Done") successMsg = "Ticket marked as done!";
+      else if (status === "Approved") successMsg = "Ticket approved successfully!";
+      else if (status === "Pending") successMsg = "Ticket rejected and sent back to pending!";
+      
+      toast.update(toastId, {
+        render: successMsg,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000
+      });
+      
+    } catch (err) {
+      console.error("Update error:", err);
+      toast.update(toastId, {
+        render: err.response?.data?.error || "Failed to update status",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000
+      });
+    } finally {
+      setUpdating((p) => ({ ...p, [id]: false }));
     }
-    setUpdating(null);
   };
 
-  /* ================= UI ================= */
-  return (
-    <div className="p-6 h-full flex flex-col">
-      <h2 className="text-2xl font-semibold mb-4">Support Tickets</h2>
+  // Update group of tickets (for approve/reject all)
+  const updateGroupStatus = async (group, status, actionText) => {
+    const groupKey = group.Issue;
+    setActionLoading(prev => ({ ...prev, [groupKey]: true }));
+    
+    const toastId = toast.loading(`${actionText}ing all tickets...`);
 
-      {/* MAIN TABS */}
-      <div className="flex gap-4 mb-6">
+    try {
+      // Update the main ticket - backend will handle all related tickets
+      const mainTicketId = group.tickets[0].TicketID;
+      
+      const response = await axios.patch(
+        `/support-tickets/status/${encodeURIComponent(mainTicketId.trim())}`, 
+        { Status: status }, 
+        authHeader
+      );
+      
+      console.log("Group update response:", response.data);
+      
+      await Promise.all([
+        loadAllTickets(),
+        loadCreatedTickets()
+      ]);
+      
+      setShowDropdown((p) => ({ ...p, [group.Issue]: false }));
+      
+      toast.update(toastId, {
+        render: `All tickets ${actionText.toLowerCase()}ed successfully!`,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000
+      });
+      return true;
+    } catch (err) {
+      console.error(`${actionText} error:`, err);
+      toast.update(toastId, {
+        render: err.response?.data?.error || `Failed to ${actionText.toLowerCase()} tickets`,
+        type: "error",
+        isLoading: false,
+        autoClose: 3000
+      });
+      return false;
+    } finally {
+      setActionLoading(prev => ({ ...prev, [groupKey]: false }));
+    }
+  };
+
+  // Filter tickets based on tab with correct logic
+  const getFilteredTickets = (tickets, tabType) => {
+    switch(tabType) {
+      case "pending":
+        return tickets.filter(t => t.Status === "Pending" || t.Status === "InProgress");
+      case "completed":
+        // Completed tab should show tickets with Status = "Done" AND Taskcompletedapproval != "Approved"
+        return tickets.filter(t => t.Status === "Done" && t.Taskcompletedapproval !== "Approved");
+      case "approved":
+        // Approved tab should show tickets with Status = "Done" AND Taskcompletedapproval = "Approved"
+        return tickets.filter(t => t.Status === "Done" && t.Taskcompletedapproval === "Approved");
+      default:
+        return tickets;
+    }
+  };
+
+  // Group tickets by Issue
+  const groupTicketsByIssue = (tickets) => {
+    const grouped = {};
+    
+    tickets.forEach(ticket => {
+      if (!grouped[ticket.Issue]) {
+        grouped[ticket.Issue] = {
+          Issue: ticket.Issue,
+          tickets: [ticket],
+          count: 1,
+          TicketID: ticket.TicketID,
+          CreatedBy: ticket.CreatedBy,
+          CreatedDate: ticket.CreatedDate,
+          IssuePhoto: ticket.IssuePhoto,
+          Status: ticket.Status,
+          WorkBy: ticket.WorkBy || "",
+          DoneDate: ticket.DoneDate || "",
+          Taskcompletedapproval: ticket.Taskcompletedapproval || "Pending",
+          AssignedTo: ticket.AssignedTo,
+          uniqueWorkBy: ticket.WorkBy ? [ticket.WorkBy] : []
+        };
+      } else {
+        grouped[ticket.Issue].tickets.push(ticket);
+        grouped[ticket.Issue].count++;
+        
+        // Track unique workBy
+        if (ticket.WorkBy && !grouped[ticket.Issue].uniqueWorkBy.includes(ticket.WorkBy)) {
+          grouped[ticket.Issue].uniqueWorkBy.push(ticket.WorkBy);
+        }
+        
+        // Update DoneDate if exists
+        if (ticket.DoneDate && !grouped[ticket.Issue].DoneDate) {
+          grouped[ticket.Issue].DoneDate = ticket.DoneDate;
+        }
+        
+        // Update Taskcompletedapproval - if any ticket is approved, show approved
+        if (ticket.Taskcompletedapproval === "Approved") {
+          grouped[ticket.Issue].Taskcompletedapproval = "Approved";
+        }
+      }
+    });
+    
+    return Object.values(grouped);
+  };
+
+  // ============== NEW FUNCTIONS FOR UNIQUE COUNTS ==============
+  // Group tickets by Issue for counting purposes only
+  const getGroupedTicketsForCount = (tickets) => {
+    const grouped = {};
+    
+    tickets.forEach(ticket => {
+      if (!grouped[ticket.Issue]) {
+        grouped[ticket.Issue] = {
+          Issue: ticket.Issue,
+          tickets: [ticket],
+          Status: ticket.Status,
+          Taskcompletedapproval: ticket.Taskcompletedapproval || "Pending"
+        };
+      } else {
+        grouped[ticket.Issue].tickets.push(ticket);
+        // Update Taskcompletedapproval - if any ticket is approved, mark group as approved
+        if (ticket.Taskcompletedapproval === "Approved") {
+          grouped[ticket.Issue].Taskcompletedapproval = "Approved";
+        }
+      }
+    });
+    
+    return Object.values(grouped);
+  };
+
+  // Get unique counts based on grouped tickets
+  const getUniqueCounts = (tickets) => {
+    const grouped = getGroupedTicketsForCount(tickets);
+    
+    const pending = grouped.filter(g => 
+      g.Status === "Pending" || g.Status === "InProgress"
+    ).length;
+    
+    const completed = grouped.filter(g => 
+      g.Status === "Done" && g.Taskcompletedapproval !== "Approved"
+    ).length;
+    
+    const approved = grouped.filter(g => 
+      g.Status === "Done" && g.Taskcompletedapproval === "Approved"
+    ).length;
+    
+    return { pending, completed, approved };
+  };
+  // ============== END OF NEW FUNCTIONS ==============
+
+  const parseDate = (dateStr) => {
+    if (!dateStr || dateStr === "") return null;
+    return dayjs(dateStr, DATE_FORMAT);
+  };
+  
+  const formatDate = (dateStr) => {
+    if (!dateStr || dateStr === "") return "N/A";
+    const date = parseDate(dateStr);
+    return date.isValid() ? date.format("DD/MM/YYYY HH:mm:ss") : dateStr;
+  };
+
+  const timeAgo = (dateStr) => {
+    if (!dateStr || dateStr === "") return "N/A";
+    const date = parseDate(dateStr);
+    return date.isValid() ? date.fromNow() : "N/A";
+  };
+
+  // ============== UPDATED COUNT VARIABLES ==============
+  // ALL TICKETS - Unique counts based on grouped tickets
+  const allCounts = getUniqueCounts(tickets);
+  const allPendingCount = allCounts.pending;
+  const allCompletedCount = allCounts.completed;
+  const allApprovedCount = allCounts.approved;
+
+  // CREATED TICKETS - Unique counts based on grouped tickets
+  const createdCounts = getUniqueCounts(createdTickets);
+  const createdPendingCount = createdCounts.pending;
+  const createdCompletedCount = createdCounts.completed;
+  const createdApprovedCount = createdCounts.approved;
+
+  // Unique total counts for main tabs
+  const uniqueAllTotal = groupTicketsByIssue(tickets).length;
+  const uniqueCreatedTotal = groupTicketsByIssue(createdTickets).length;
+  // ============== END OF UPDATED COUNT VARIABLES ==============
+
+  // Filter and group tickets
+  const filteredAll = getFilteredTickets(tickets, allTab);
+  const filteredCreated = getFilteredTickets(createdTickets, createdTab);
+  
+  const groupedAll = groupTicketsByIssue(filteredAll);
+  const groupedCreated = groupTicketsByIssue(filteredCreated);
+
+  return (
+    <div className="p-4 max-w-6xl mx-auto">
+      <ToastContainer position="top-right" autoClose={3000} />
+      
+      <h2 className="text-xl font-semibold mb-3">Support Tickets</h2>
+
+      {/* MAIN TABS - UPDATED WITH UNIQUE COUNTS */}
+      <div className="flex gap-2 mb-3">
         <button
           onClick={() => setActiveMainTab("all")}
-          className={`px-4 py-2 rounded ${activeMainTab === "all" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
+          className={`px-3 py-1.5 rounded text-sm transition ${
+            activeMainTab === "all" 
+              ? "bg-blue-600 text-white" 
+              : "bg-gray-200 hover:bg-gray-300"
+          }`}
         >
-          All Support Tickets
+          All Support Tickets ({uniqueAllTotal})
         </button>
 
         <button
           onClick={() => setActiveMainTab("create")}
-          className={`px-4 py-2 rounded ${activeMainTab === "create" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
+          className={`px-3 py-1.5 rounded text-sm transition ${
+            activeMainTab === "create" 
+              ? "bg-blue-600 text-white" 
+              : "bg-gray-200 hover:bg-gray-300"
+          }`}
         >
-          Create Support Ticket
+          Create Support Ticket ({uniqueCreatedTotal})
         </button>
       </div>
 
-      {/* ================= ALL TICKETS ================= */}
+      {/* ================= ALL TICKETS TAB ================= */}
       {activeMainTab === "all" && (
         <>
-          {/* STATUS FILTER */}
-          <div className="bg-white p-4 rounded shadow mb-4 flex gap-2">
-            {[
-              { label: "All", value: "" },
-              { label: "Pending", value: "Pending" },
-              { label: "In Progress", value: "InProgress" },
-              { label: "Done", value: "Done" },
-            ].map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setStatusFilter(tab.value)}
-                className={`px-4 py-2 rounded ${statusFilter === tab.value ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          {/* SUB TABS - UPDATED WITH UNIQUE COUNTS */}
+          <div className="flex gap-1 mb-3 border-b text-sm">
+            <button
+              onClick={() => setAllTab("pending")}
+              className={`px-3 py-1.5 whitespace-nowrap transition ${
+                allTab === "pending" 
+                  ? "border-b-2 border-blue-600 text-blue-600 font-medium" 
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              Pending/InProgress ({allPendingCount})
+            </button>
+            <button
+              onClick={() => setAllTab("completed")}
+              className={`px-3 py-1.5 whitespace-nowrap transition ${
+                allTab === "completed" 
+                  ? "border-b-2 border-blue-600 text-blue-600 font-medium" 
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              Completed ({allCompletedCount})
+            </button>
+            <button
+              onClick={() => setAllTab("approved")}
+              className={`px-3 py-1.5 whitespace-nowrap transition ${
+                allTab === "approved" 
+                  ? "border-b-2 border-blue-600 text-blue-600 font-medium" 
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              Approved ({allApprovedCount})
+            </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto pr-2">
-            {allTicketsLoading && <div className="text-center py-6">Loading tickets...</div>}
+          {/* TICKETS LIST */}
+          <div className="space-y-2">
+            {allTicketsLoading && (
+              <div className="text-center py-6 text-sm">Loading tickets...</div>
+            )}
 
-            {!allTicketsLoading &&
-              tickets
-    .filter((ticket, index, self) => 
-      index === self.findIndex(t => t.Issue === ticket.Issue)
-    )
-    .map((t) => {
-      const sameIssueCount = tickets.filter(t2 => t2.Issue === t.Issue).length;
-                const date = dayjs(t.CreatedDate, DATE_FORMAT);
-                return (
-                  <div
-                    key={t.TicketID}
-                    className="bg-white p-4 rounded shadow mb-4 flex justify-between items-center"
-                  >
-                    <div>
-                      <div className="font-semibold">Ticket ID : {t.TicketID}</div>
+            {!allTicketsLoading && groupedAll.length === 0 && (
+              <div className="text-gray-500 text-center py-6 bg-white rounded-lg shadow-sm text-sm">
+                No tickets in this section
+              </div>
+            )}
 
-                      <div className="font-semibold">Problem : {t.Issue}</div>
-                      <div className="text-sm">Created By: {t.CreatedBy}</div>
-                      <div className="text-sm">Assigned To: {"MIS TEAM "||t.AssignedTo}</div>
-                      <div className="text-sm text-gray-500">{date.fromNow()}</div>
+            {!allTicketsLoading && groupedAll.map((group) => {
+              const isActionLoading = actionLoading[group.Issue];
+              
+              return (
+                <div key={group.Issue} className="bg-white p-3 rounded-lg shadow-sm border hover:shadow transition">
+                  <div className="flex flex-col md:flex-row justify-between gap-2">
+                    <div className="flex-1">
+                      {/* Line 1: Ticket ID and Issue */}
+                      <div className="flex items-start gap-2 mb-1">
+                        <span className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono whitespace-nowrap">
+                          {group.TicketID}
+                        </span>
+                        {group.count > 1 && (
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded whitespace-nowrap">
+                            {group.count} tickets
+                          </span>
+                        )}
+                        <span className="font-medium text-sm line-clamp-2 flex-1">
+                          {group.Issue}
+                        </span>
+                      </div>
+                      
+                      {/* Line 2: Created By and Created Date */}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs mb-1">
+                        <span className="text-gray-500">Created By:</span>
+                        <span className="font-medium">{group.CreatedBy}</span>
+                        <span className="text-gray-400">•</span>
+                        <span className="text-gray-500">Created:</span>
+                        <span className="font-medium">{formatDate(group.CreatedDate)}</span>
+                      </div>
+                      
+                      {/* Line 3: Assigned To / Work By | Status | Done Date */}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                        <span className="text-gray-500">Assigned To:</span>
+                        <span className="font-medium text-blue-600">
+                          {group.uniqueWorkBy && group.uniqueWorkBy.length > 0 
+                            ? group.uniqueWorkBy.join(", ") 
+                            : "MIS"}
+                        </span>
+                        
+                        <span className="text-gray-400">•</span>
+                        
+                        <span className="text-gray-500">Status:</span>
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium
+                          ${group.Status === "Pending" ? "bg-yellow-100 text-yellow-800" : ""}
+                          ${group.Status === "InProgress" ? "bg-blue-100 text-blue-800" : ""}
+                          ${group.Status === "Done" ? "bg-green-100 text-green-800" : ""}
+                        `}>
+                          {group.Status}
+                        </span>
+                        
+                        {group.Taskcompletedapproval === "Approved" && (
+                          <>
+                            <span className="text-gray-400">•</span>
+                            <span className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded text-xs font-medium">
+                              ✓ Approved
+                            </span>
+                          </>
+                        )}
+                        
+                        {group.DoneDate && (
+                          <>
+                            <span className="text-gray-400">•</span>
+                            <span className="text-gray-500">Done:</span>
+                            <span className="font-medium text-green-600">
+                              {formatDate(group.DoneDate)}
+                            </span>
+                          </>
+                        )}
+                        
+                        <span className="text-gray-400">•</span>
+                        <span className="text-gray-400">
+                          {timeAgo(group.CreatedDate)}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {t.IssuePhoto && (
+                    {/* Action Buttons */}
+                    <div className="flex flex-row items-center gap-1 mt-2 md:mt-0 md:ml-2">
+                      {group.IssuePhoto && (
                         <button
-                          onClick={() => setModalImage(t.IssuePhoto)}
-                          className="bg-gray-700 text-white px-3 py-1 rounded"
+                          onClick={() => setModalImage(group.IssuePhoto)}
+                          className="bg-gray-600 text-white px-2 py-1 rounded text-xs hover:bg-gray-700 transition"
                         >
-                          View Image
+                          View
                         </button>
                       )}
-                      <span className="px-3 py-1 rounded bg-blue-600 text-white">{t.Status}</span>
+
+                      {/* Show dropdown in Completed tab for non-MIS users */}
+                      {allTab === "completed" && group.Status === "Done" && userDept !== "MIS" && (
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowDropdown({ ...showDropdown, [group.Issue]: !showDropdown[group.Issue] })}
+                            disabled={isActionLoading}
+                            className="bg-purple-600 text-white px-2 py-1 rounded text-xs hover:bg-purple-700 transition flex items-center gap-1 disabled:opacity-50"
+                          >
+                            {isActionLoading ? "..." : (
+                              <>
+                                <span>Actions</span>
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </>
+                            )}
+                          </button>
+                          
+                          {showDropdown[group.Issue] && !isActionLoading && (
+                            <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg z-10 border text-xs">
+                              <button
+                                onClick={async () => {
+                                  const success = await updateGroupStatus(group, "Approved", "Approv");
+                                  if (success) {
+                                    setShowDropdown({ ...showDropdown, [group.Issue]: false });
+                                  }
+                                }}
+                                className="block w-full text-left px-3 py-2 text-green-700 hover:bg-green-50 transition font-medium border-b"
+                              >
+                                ✓ Approve All
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  const success = await updateGroupStatus(group, "Pending", "Reject");
+                                  if (success) {
+                                    setShowDropdown({ ...showDropdown, [group.Issue]: false });
+                                  }
+                                }}
+                                className="block w-full text-left px-3 py-2 text-red-700 hover:bg-red-50 transition"
+                              >
+                                ↺ Reject All
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Show approved badge in approved tab */}
+                      {allTab === "approved" && group.Taskcompletedapproval === "Approved" && (
+                        <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-medium">
+                          ✓ Approved
+                        </span>
+                      )}
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              );
+            })}
           </div>
         </>
       )}
@@ -589,179 +641,267 @@ export default function SupportTicket() {
       {activeMainTab === "create" && (
         <>
           {/* CREATE FORM */}
-          <div className="bg-white p-6 rounded shadow mb-6">
-            <h3 className="text-xl font-semibold mb-4">Create Ticket</h3>
-{/* 
-            <select
-              className="w-full border p-2 rounded mb-3"
-              value={form.AssignedTo}
-              onChange={(e) => setForm({ ...form, AssignedTo: e.target.value })}
-            >
-              <option value="">Select Employee</option>
- <option value={"Sagar Soni"}>{"SAGAR SONI"}</option>
-              <option value={"Devyani Bhatt"}>{"Devyani Bhatt"}</option>
-              <option value={"Govind Vora"}>{"Govind Vora"}</option>         
-                    <option value={"Mohammad Sami "}>{"Mohammad Sami "}</option>
-
-              {/* {employees.map((e) => (
-                <option key={e.name} value={e.name}>
-                  {e.name.toUpperCase()}
-                </option>
-              ))} 
-            </select> */}
+          <div className="bg-white p-3 rounded-lg shadow-sm mb-4 border">
+            <h3 className="font-medium text-sm mb-2">Create New Ticket</h3>
 
             <textarea
-              className="w-full border p-2 rounded mb-3"
-              placeholder="Issue"
+              className="w-full border p-2 rounded mb-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+              placeholder="Describe the issue..."
               value={form.Issue}
               onChange={(e) => setForm({ ...form, Issue: e.target.value })}
+              rows="2"
             />
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="mb-3"
-            />
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="text-sm"
+              />
+            </div>
 
             {form.IssuePhoto && (
-              <img
-                src={URL.createObjectURL(form.IssuePhoto)}
-                alt="preview"
-                className="w-32 h-32 object-cover mb-3 border rounded"
-                loading="lazy"
-              />
+              <div className="mb-2">
+                <img
+                  src={URL.createObjectURL(form.IssuePhoto)}
+                  alt="preview"
+                  className="w-16 h-16 object-cover border rounded"
+                />
+              </div>
             )}
 
             <button
               disabled={creating}
               onClick={createTicket}
-              className="bg-green-600 text-white px-6 py-2 rounded"
+              className={`px-3 py-1.5 rounded text-white text-sm transition ${
+                creating 
+                  ? "bg-gray-400 cursor-not-allowed" 
+                  : "bg-green-600 hover:bg-green-700"
+              }`}
             >
               {creating ? "Creating..." : "Create Ticket"}
             </button>
           </div>
 
-          {/* CREATED TICKETS */}
-          <h3 className="text-xl font-semibold mb-3">Created Tickets</h3>
-
-          {createdTicketsLoading && <div className="text-center py-6">Loading created tickets...</div>}
-
-          {!createdTicketsLoading && createdTickets.length === 0 && (
-            <div className="text-gray-500">No pending tickets</div>
-          )}
-
-       {!createdTicketsLoading && (() => {
-  // Filter to show only unique issues (first occurrence)
-  const uniqueIssues = createdTickets.filter((ticket, index, self) =>
-    index === self.findIndex(t => t.Issue === ticket.Issue)
-  );
-
-  return (
-    <div>
-      {uniqueIssues.length === 0 ? (
-        <div className="text-gray-500">No tickets created by you</div>
-      ) : (
-        uniqueIssues.map((t) => {
-          // Find all tickets with same issue
-          const sameIssueTickets = createdTickets.filter(
-            ticket => ticket.Issue === t.Issue
-          );
-          const allPending = sameIssueTickets.every(ticket => ticket.Status === "InProgress");
-
-          return (
-            <div
-              key={t.TicketID}
-              className="bg-white p-4 rounded shadow mb-3 flex justify-between items-center"
+          {/* SUB TABS FOR CREATED - UPDATED WITH UNIQUE COUNTS */}
+          <div className="flex gap-1 mb-3 border-b text-sm">
+            <button
+              onClick={() => setCreatedTab("pending")}
+              className={`px-3 py-1.5 whitespace-nowrap transition ${
+                createdTab === "pending" 
+                  ? "border-b-2 border-blue-600 text-blue-600 font-medium" 
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
             >
-              <div className="flex-1">
-                <div className="font-semibold">
-                  Problem: {t.Issue}
-                  {sameIssueTickets.length > 1 && (
-                    <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                      {sameIssueTickets.length} tickets
-                    </span>
-                  )}
-                </div>
-                
-                <div className="text-sm text-gray-600">
-                  {sameIssueTickets.length === 1 
-                    ? `Ticket ID: ${t.TicketID}`
-                    : `Multiple tickets (including ${t.TicketID})`
-                  }
-                </div>
-                
-                <div className="text-sm">
-                  Assigned To: {t.AssignedTo}
-                  {sameIssueTickets.length > 1 && (
-                    <span className="text-gray-500 ml-1">
-                      +{sameIssueTickets.length - 1} more
-                    </span>
-                  )}
-                </div>
-                
-                <div className="text-sm text-gray-500">
-                  {dayjs(t.CreatedDate, DATE_FORMAT).fromNow()}
-                </div>
+              Pending/InProgress ({createdPendingCount})
+            </button>
+            <button
+              onClick={() => setCreatedTab("completed")}
+              className={`px-3 py-1.5 whitespace-nowrap transition ${
+                createdTab === "completed" 
+                  ? "border-b-2 border-blue-600 text-blue-600 font-medium" 
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              Completed ({createdCompletedCount})
+            </button>
+            <button
+              onClick={() => setCreatedTab("approved")}
+              className={`px-3 py-1.5 whitespace-nowrap transition ${
+                createdTab === "approved" 
+                  ? "border-b-2 border-blue-600 text-blue-600 font-medium" 
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              Approved ({createdApprovedCount})
+            </button>
+          </div>
+
+          {/* CREATED TICKETS LIST */}
+          <div className="space-y-2">
+            {createdTicketsLoading && (
+              <div className="text-center py-6 text-sm">Loading created tickets...</div>
+            )}
+
+            {!createdTicketsLoading && groupedCreated.length === 0 && (
+              <div className="text-gray-500 text-center py-6 bg-white rounded-lg shadow-sm text-sm">
+                No tickets in this section
               </div>
+            )}
 
-              <div className="flex items-center gap-2">
-                {t.IssuePhoto && (
-                  <button
-                    onClick={() => setModalImage(t.IssuePhoto)}
-                    className="bg-gray-700 text-white px-3 py-1 rounded text-sm"
-                  >
-                    View Image
-                  </button>
-                )}
+            {!createdTicketsLoading && groupedCreated.map((group) => {
+              const isActionLoading = actionLoading[group.Issue];
+              
+              return (
+                <div key={group.Issue} className="bg-white p-3 rounded-lg shadow-sm border hover:shadow transition">
+                  <div className="flex flex-col md:flex-row justify-between gap-2">
+                    <div className="flex-1">
+                      {/* Line 1: Ticket ID and Issue */}
+                      <div className="flex items-start gap-2 mb-1">
+                        <span className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono whitespace-nowrap">
+                          {group.TicketID}
+                        </span>
+                        {group.count > 1 && (
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded whitespace-nowrap">
+                            {group.count} tickets
+                          </span>
+                        )}
+                        <span className="font-medium text-sm line-clamp-2 flex-1">
+                          {group.Issue}
+                        </span>
+                      </div>
+                      
+                      {/* Line 2: Created By and Created Date */}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs mb-1">
+                        <span className="text-gray-500">Created By:</span>
+                        <span className="font-medium">{group.CreatedBy}</span>
+                        <span className="text-gray-400">•</span>
+                        <span className="text-gray-500">Created:</span>
+                        <span className="font-medium">{formatDate(group.CreatedDate)}</span>
+                      </div>
+                      
+                      {/* Line 3: Assigned To / Work By | Status | Done Date */}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                        <span className="text-gray-500">Assigned To:</span>
+                        <span className="font-medium text-blue-600">
+                          {group.uniqueWorkBy && group.uniqueWorkBy.length > 0 
+                            ? group.uniqueWorkBy.join(", ") 
+                            : "MIS"}
+                        </span>
+                        
+                        <span className="text-gray-400">•</span>
+                        
+                        <span className="text-gray-500">Status:</span>
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium
+                          ${group.Status === "Pending" ? "bg-yellow-100 text-yellow-800" : ""}
+                          ${group.Status === "InProgress" ? "bg-blue-100 text-blue-800" : ""}
+                          ${group.Status === "Done" ? "bg-green-100 text-green-800" : ""}
+                        `}>
+                          {group.Status}
+                        </span>
+                        
+                        {group.Taskcompletedapproval === "Approved" && (
+                          <>
+                            <span className="text-gray-400">•</span>
+                            <span className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded text-xs font-medium">
+                              ✓ Approved
+                            </span>
+                          </>
+                        )}
+                        
+                        {group.DoneDate && (
+                          <>
+                            <span className="text-gray-400">•</span>
+                            <span className="text-gray-500">Done:</span>
+                            <span className="font-medium text-green-600">
+                              {formatDate(group.DoneDate)}
+                            </span>
+                          </>
+                        )}
+                        
+                        <span className="text-gray-400">•</span>
+                        <span className="text-gray-400">
+                          {timeAgo(group.CreatedDate)}
+                        </span>
+                      </div>
+                    </div>
 
-                {allPending ? (
-                  <button
-                    disabled={updating === t.TicketID}
-                    onClick={() => {
-                      // Update all tickets with same issue
-                      sameIssueTickets.forEach(ticket => {
-                        markDone(ticket.TicketID);
-                      });
-                    }}
-                    className="bg-green-600 text-white px-3 py-1 rounded text-sm"
-                  >
-                    {updating === t.TicketID ? "Updating..." : "Mark All Done"}
-                  </button>
-                ) : (
-                  <div className="text-sm px-3 py-1 bg-gray-100 rounded">
-                    {t.Status}
+                    {/* Action Buttons */}
+                    <div className="flex flex-row items-center gap-1 mt-2 md:mt-0 md:ml-2">
+                      {group.IssuePhoto && (
+                        <button
+                          onClick={() => setModalImage(group.IssuePhoto)}
+                          className="bg-gray-600 text-white px-2 py-1 rounded text-xs hover:bg-gray-700 transition"
+                        >
+                          View
+                        </button>
+                      )}
+
+                      {/* For Created view - Completed tab: Show Approve/Reject dropdown */}
+                      {createdTab === "completed" && group.Status === "Done" && (
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowDropdown({ ...showDropdown, [group.Issue]: !showDropdown[group.Issue] })}
+                            disabled={isActionLoading}
+                            className="bg-purple-600 text-white px-2 py-1 rounded text-xs hover:bg-purple-700 transition flex items-center gap-1 disabled:opacity-50"
+                          >
+                            {isActionLoading ? "..." : (
+                              <>
+                                <span>Actions</span>
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </>
+                            )}
+                          </button>
+                          
+                          {showDropdown[group.Issue] && !isActionLoading && (
+                            <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg z-10 border text-xs">
+                              <button
+                                onClick={async () => {
+                                  const success = await updateGroupStatus(group, "Approved", "Approv");
+                                  if (success) {
+                                    setShowDropdown({ ...showDropdown, [group.Issue]: false });
+                                  }
+                                }}
+                                className="block w-full text-left px-3 py-2 text-green-700 hover:bg-green-50 transition font-medium border-b"
+                              >
+                                ✓ Approve All
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  const success = await updateGroupStatus(group, "Pending", "Reject");
+                                  if (success) {
+                                    setShowDropdown({ ...showDropdown, [group.Issue]: false });
+                                  }
+                                }}
+                                className="block w-full text-left px-3 py-2 text-red-700 hover:bg-red-50 transition"
+                              >
+                                ↺ Reject All
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Show approved badge in approved tab */}
+                      {createdTab === "approved" && group.Taskcompletedapproval === "Approved" && (
+                        <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-medium">
+                          ✓ Approved
+                        </span>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-})()}
-
+                </div>
+              );
+            })}
+          </div>
         </>
       )}
 
       {/* IMAGE MODAL */}
       {modalImage && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-          <div className="relative">
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 p-4"
+          onClick={() => setModalImage(null)}
+        >
+          <div className="relative max-w-2xl max-h-full">
             <button
-              onClick={() => setModalImage(null)}
-              className="absolute top-2 right-2 bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold hover:bg-red-700"
+              onClick={(e) => {
+                e.stopPropagation();
+                setModalImage(null);
+              }}
+              className="absolute top-2 right-2 text-white bg-red-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold hover:bg-red-700 z-10 transition"
             >
               ×
             </button>
-
             <img
               src={modalImage}
               alt="Issue"
-              className="max-w-[90vw] max-h-[90vh] rounded shadow-lg object-contain"
-              loading="lazy"
+              className="max-w-full max-h-[80vh] rounded shadow-lg object-contain"
+              onClick={(e) => e.stopPropagation()}
             />
           </div>
         </div>
