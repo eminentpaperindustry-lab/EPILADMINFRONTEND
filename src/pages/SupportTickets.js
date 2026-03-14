@@ -578,7 +578,7 @@ export default function SupportTicket() {
                       {/* Show dropdown in Completed tab for non-MIS users */}
                       {allTab === "completed" && group.Status === "Done" && userDept !== "MIS" && (
                         <div className="relative">
-                          <button
+                          {/* <button
                             onClick={() => setShowDropdown({ ...showDropdown, [group.Issue]: !showDropdown[group.Issue] })}
                             disabled={isActionLoading}
                             className="bg-purple-600 text-white px-2 py-1 rounded text-xs hover:bg-purple-700 transition flex items-center gap-1 disabled:opacity-50"
@@ -591,7 +591,7 @@ export default function SupportTicket() {
                                 </svg>
                               </>
                             )}
-                          </button>
+                          </button> */}
                           
                           {showDropdown[group.Issue] && !isActionLoading && (
                             <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg z-10 border text-xs">
