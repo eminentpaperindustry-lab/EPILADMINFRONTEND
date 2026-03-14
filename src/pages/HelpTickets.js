@@ -18,7 +18,7 @@ export default function HelpTickets() {
   const [filters, setFilters] = useState({
     assignedTo: "",
     createdBy: "",
-    status: "", // Added status filter
+    status: "", // Can be "", "Pending", "InProgress", "Done", or "Active" for both Pending/InProgress
   });
 
   const [form, setForm] = useState({
@@ -40,11 +40,29 @@ export default function HelpTickets() {
   const loadTickets = async () => {
     setLoading(true);
     try {
+      let params = { ...filters };
+      
+      // If status filter is "Active", don't send status param to get all tickets
+      // We'll filter them client-side
+      if (params.status === "Active") {
+        delete params.status;
+      }
+      
       const res = await axios.get("/helpTickets/all", {
         ...authHeader,
-        params: filters,
+        params: params,
       });
-      setTickets(res.data.tickets || []);
+      
+      let filteredTickets = res.data.tickets || [];
+      
+      // Client-side filtering for Active status (Pending + InProgress)
+      if (filters.status === "Active") {
+        filteredTickets = filteredTickets.filter(t => 
+          t.Status === "Pending" || t.Status === "InProgress"
+        );
+      }
+      
+      setTickets(filteredTickets);
     } catch (err) {
       console.error(err);
       alert("Failed to fetch tickets");
@@ -202,10 +220,12 @@ export default function HelpTickets() {
           return "bg-yellow-500 text-white";
         case "InProgress":
           return "bg-blue-500 text-white";
+        case "Active":
+          return "bg-purple-600 text-white";
         case "Done":
           return "bg-green-500 text-white";
         default:
-          return "bg-purple-600 text-white"; // For "All" tab
+          return "bg-gray-600 text-white"; // For "All" tab
       }
     }
     return "bg-gray-200 text-gray-700 hover:bg-gray-300";
@@ -243,30 +263,27 @@ export default function HelpTickets() {
       {activeTab === "all" && (
         <>
           {/* STATUS FILTER TABS - With different colors */}
-          <div className="bg-white p-4 rounded shadow mb-4 flex gap-2">
+          <div className="bg-white p-4 rounded shadow mb-4 flex gap-2 flex-wrap">
+            {/* Active tab for Pending + InProgress */}
             <button
-              onClick={() => handleStatusFilter("")}
-              className={`px-4 py-2 rounded transition-colors ${getStatusTabColor("")}`}
+              onClick={() => handleStatusFilter("Active")}
+              className={`px-4 py-2 rounded transition-colors ${getStatusTabColor("Active")}`}
             >
-              All
+               (Pending & In Progress)
             </button>
-            <button
-              onClick={() => handleStatusFilter("Pending")}
-              className={`px-4 py-2 rounded transition-colors ${getStatusTabColor("Pending")}`}
-            >
-              Pending
-            </button>
-            <button
-              onClick={() => handleStatusFilter("InProgress")}
-              className={`px-4 py-2 rounded transition-colors ${getStatusTabColor("InProgress")}`}
-            >
-              In Progress
-            </button>
+            
             <button
               onClick={() => handleStatusFilter("Done")}
               className={`px-4 py-2 rounded transition-colors ${getStatusTabColor("Done")}`}
             >
               Done
+            </button>
+
+            <button
+              onClick={() => handleStatusFilter("")}
+              className={`px-4 py-2 rounded transition-colors ${getStatusTabColor("")}`}
+            >
+              All
             </button>
           </div>
 
@@ -274,7 +291,8 @@ export default function HelpTickets() {
             {loading && <div className="text-center py-6 text-gray-500">Loading tickets...</div>}
             {!loading && tickets.length === 0 && (
               <div className="text-center py-6 text-gray-500">
-                {filters.status ? `No ${filters.status} tickets available` : "No tickets available"}
+                {filters.status === "Active" ? "No active tickets (Pending or In Progress)" : 
+                 filters.status ? `No ${filters.status} tickets available` : "No tickets available"}
               </div>
             )}
             {!loading && tickets.map(t => <TicketCard key={t.TicketID} ticket={t} showMarkDone={false} />)}

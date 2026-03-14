@@ -22,11 +22,11 @@ export default function SupportTicket() {
   const [createdTickets, setCreatedTickets] = useState([]);
   const [employees, setEmployees] = useState([]);
   
-  // Tab states for All view
-  const [allTab, setAllTab] = useState("pending");
+  // Status filter for All view
+  const [statusFilter, setStatusFilter] = useState(""); // "", "Active", "Done", "Approved"
   
-  // Tab states for Created view
-  const [createdTab, setCreatedTab] = useState("pending");
+  // Status filter for Created view
+  const [createdStatusFilter, setCreatedStatusFilter] = useState(""); // "", "Active", "Done", "Approved"
 
   const [allTicketsLoading, setAllTicketsLoading] = useState(false);
   const [createdTicketsLoading, setCreatedTicketsLoading] = useState(false);
@@ -259,16 +259,16 @@ export default function SupportTicket() {
     }
   };
 
-  // Filter tickets based on tab with correct logic
-  const getFilteredTickets = (tickets, tabType) => {
-    switch(tabType) {
-      case "pending":
+  // Filter tickets based on status filter
+  const getFilteredTickets = (tickets, filter) => {
+    if (!filter) return tickets;
+    
+    switch(filter) {
+      case "Active":
         return tickets.filter(t => t.Status === "Pending" || t.Status === "InProgress");
-      case "completed":
-        // Completed tab should show tickets with Status = "Done" AND Taskcompletedapproval != "Approved"
+      case "Done":
         return tickets.filter(t => t.Status === "Done" && t.Taskcompletedapproval !== "Approved");
-      case "approved":
-        // Approved tab should show tickets with Status = "Done" AND Taskcompletedapproval = "Approved"
+      case "Approved":
         return tickets.filter(t => t.Status === "Done" && t.Taskcompletedapproval === "Approved");
       default:
         return tickets;
@@ -320,7 +320,6 @@ export default function SupportTicket() {
     return Object.values(grouped);
   };
 
-  // ============== NEW FUNCTIONS FOR UNIQUE COUNTS ==============
   // Group tickets by Issue for counting purposes only
   const getGroupedTicketsForCount = (tickets) => {
     const grouped = {};
@@ -349,7 +348,7 @@ export default function SupportTicket() {
   const getUniqueCounts = (tickets) => {
     const grouped = getGroupedTicketsForCount(tickets);
     
-    const pending = grouped.filter(g => 
+    const active = grouped.filter(g => 
       g.Status === "Pending" || g.Status === "InProgress"
     ).length;
     
@@ -361,9 +360,8 @@ export default function SupportTicket() {
       g.Status === "Done" && g.Taskcompletedapproval === "Approved"
     ).length;
     
-    return { pending, completed, approved };
+    return { active, completed, approved };
   };
-  // ============== END OF NEW FUNCTIONS ==============
 
   const parseDate = (dateStr) => {
     if (!dateStr || dateStr === "") return null;
@@ -382,30 +380,74 @@ export default function SupportTicket() {
     return date.isValid() ? date.fromNow() : "N/A";
   };
 
-  // ============== UPDATED COUNT VARIABLES ==============
+  // ============== COUNT VARIABLES ==============
   // ALL TICKETS - Unique counts based on grouped tickets
   const allCounts = getUniqueCounts(tickets);
-  const allPendingCount = allCounts.pending;
+  const allActiveCount = allCounts.active;
   const allCompletedCount = allCounts.completed;
   const allApprovedCount = allCounts.approved;
 
   // CREATED TICKETS - Unique counts based on grouped tickets
   const createdCounts = getUniqueCounts(createdTickets);
-  const createdPendingCount = createdCounts.pending;
+  const createdActiveCount = createdCounts.active;
   const createdCompletedCount = createdCounts.completed;
   const createdApprovedCount = createdCounts.approved;
 
   // Unique total counts for main tabs
   const uniqueAllTotal = groupTicketsByIssue(tickets).length;
   const uniqueCreatedTotal = groupTicketsByIssue(createdTickets).length;
-  // ============== END OF UPDATED COUNT VARIABLES ==============
 
-  // Filter and group tickets
-  const filteredAll = getFilteredTickets(tickets, allTab);
-  const filteredCreated = getFilteredTickets(createdTickets, createdTab);
-  
+  // Filter and group tickets for All view
+  const filteredAll = getFilteredTickets(tickets, statusFilter);
   const groupedAll = groupTicketsByIssue(filteredAll);
+  
+  // Filter and group tickets for Created view
+  const filteredCreated = getFilteredTickets(createdTickets, createdStatusFilter);
   const groupedCreated = groupTicketsByIssue(filteredCreated);
+
+  // Function to get status button class for All view
+  const getStatusButtonClass = (status) => {
+    const baseClasses = "px-4 py-2 rounded transition-colors";
+    
+    if (statusFilter === status) {
+      switch(status) {
+        case "Active":
+          return `${baseClasses} bg-purple-600 text-white`;
+        case "Done":
+          return `${baseClasses} bg-green-500 text-white`;
+        case "Approved":
+          return `${baseClasses} bg-blue-600 text-white`;
+        case "":
+          return `${baseClasses} bg-gray-600 text-white`;
+        default:
+          return `${baseClasses} bg-gray-600 text-white`;
+      }
+    }
+    
+    return `${baseClasses} bg-gray-200 text-gray-700 hover:bg-gray-300`;
+  };
+
+  // Function to get status button class for Created view
+  const getCreatedStatusButtonClass = (status) => {
+    const baseClasses = "px-4 py-2 rounded transition-colors";
+    
+    if (createdStatusFilter === status) {
+      switch(status) {
+        case "Active":
+          return `${baseClasses} bg-purple-600 text-white`;
+        case "Done":
+          return `${baseClasses} bg-green-500 text-white`;
+        case "Approved":
+          return `${baseClasses} bg-blue-600 text-white`;
+        case "":
+          return `${baseClasses} bg-gray-600 text-white`;
+        default:
+          return `${baseClasses} bg-gray-600 text-white`;
+      }
+    }
+    
+    return `${baseClasses} bg-gray-200 text-gray-700 hover:bg-gray-300`;
+  };
 
   return (
     <div className="p-4 max-w-6xl mx-auto">
@@ -413,7 +455,7 @@ export default function SupportTicket() {
       
       <h2 className="text-xl font-semibold mb-3">Support Tickets</h2>
 
-      {/* MAIN TABS - UPDATED WITH UNIQUE COUNTS */}
+      {/* MAIN TABS */}
       <div className="flex gap-2 mb-3">
         <button
           onClick={() => setActiveMainTab("all")}
@@ -441,41 +483,38 @@ export default function SupportTicket() {
       {/* ================= ALL TICKETS TAB ================= */}
       {activeMainTab === "all" && (
         <>
-          {/* SUB TABS - UPDATED WITH UNIQUE COUNTS */}
-          <div className="flex gap-1 mb-3 border-b text-sm">
+          {/* STATUS FILTER TABS - For All view */}
+          <div className="bg-white p-4 rounded shadow mb-4 flex gap-2 flex-wrap">
             <button
-              onClick={() => setAllTab("pending")}
-              className={`px-3 py-1.5 whitespace-nowrap transition ${
-                allTab === "pending" 
-                  ? "border-b-2 border-blue-600 text-blue-600 font-medium" 
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
+              onClick={() => setStatusFilter("Active")}
+              className={getStatusButtonClass("Active")}
             >
-              Pending/InProgress ({allPendingCount})
+              Active (Pending & In Progress) ({allActiveCount})
             </button>
+            
             <button
-              onClick={() => setAllTab("completed")}
-              className={`px-3 py-1.5 whitespace-nowrap transition ${
-                allTab === "completed" 
-                  ? "border-b-2 border-blue-600 text-blue-600 font-medium" 
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
+              onClick={() => setStatusFilter("Done")}
+              className={getStatusButtonClass("Done")}
             >
               Completed ({allCompletedCount})
             </button>
+            
             <button
-              onClick={() => setAllTab("approved")}
-              className={`px-3 py-1.5 whitespace-nowrap transition ${
-                allTab === "approved" 
-                  ? "border-b-2 border-blue-600 text-blue-600 font-medium" 
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
+              onClick={() => setStatusFilter("Approved")}
+              className={getStatusButtonClass("Approved")}
             >
               Approved ({allApprovedCount})
             </button>
+
+            <button
+              onClick={() => setStatusFilter("")}
+              className={getStatusButtonClass("")}
+            >
+              All ({uniqueAllTotal})
+            </button>
           </div>
 
-          {/* TICKETS LIST */}
+          {/* TICKETS LIST - All view */}
           <div className="space-y-2">
             {allTicketsLoading && (
               <div className="text-center py-6 text-sm">Loading tickets...</div>
@@ -483,7 +522,10 @@ export default function SupportTicket() {
 
             {!allTicketsLoading && groupedAll.length === 0 && (
               <div className="text-gray-500 text-center py-6 bg-white rounded-lg shadow-sm text-sm">
-                No tickets in this section
+                {statusFilter === "Active" ? "No active tickets" :
+                 statusFilter === "Done" ? "No completed tickets" :
+                 statusFilter === "Approved" ? "No approved tickets" :
+                 "No tickets available"}
               </div>
             )}
 
@@ -575,10 +617,10 @@ export default function SupportTicket() {
                         </button>
                       )}
 
-                      {/* Show dropdown in Completed tab for non-MIS users */}
-                      {allTab === "completed" && group.Status === "Done" && userDept !== "MIS" && (
+                      {/* Show dropdown in Completed filter for non-MIS users */}
+                      {statusFilter === "Done" && group.Status === "Done" && userDept !== "MIS" && (
                         <div className="relative">
-                          {/* <button
+                          <button
                             onClick={() => setShowDropdown({ ...showDropdown, [group.Issue]: !showDropdown[group.Issue] })}
                             disabled={isActionLoading}
                             className="bg-purple-600 text-white px-2 py-1 rounded text-xs hover:bg-purple-700 transition flex items-center gap-1 disabled:opacity-50"
@@ -591,7 +633,7 @@ export default function SupportTicket() {
                                 </svg>
                               </>
                             )}
-                          </button> */}
+                          </button>
                           
                           {showDropdown[group.Issue] && !isActionLoading && (
                             <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg z-10 border text-xs">
@@ -622,8 +664,8 @@ export default function SupportTicket() {
                         </div>
                       )}
                       
-                      {/* Show approved badge in approved tab */}
-                      {allTab === "approved" && group.Taskcompletedapproval === "Approved" && (
+                      {/* Show approved badge in approved filter */}
+                      {statusFilter === "Approved" && group.Taskcompletedapproval === "Approved" && (
                         <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-medium">
                           ✓ Approved
                         </span>
@@ -685,37 +727,34 @@ export default function SupportTicket() {
             </button>
           </div>
 
-          {/* SUB TABS FOR CREATED - UPDATED WITH UNIQUE COUNTS */}
-          <div className="flex gap-1 mb-3 border-b text-sm">
+          {/* STATUS FILTER TABS - For Created view - Now matching All view style */}
+          <div className="bg-white p-4 rounded shadow mb-4 flex gap-2 flex-wrap">
             <button
-              onClick={() => setCreatedTab("pending")}
-              className={`px-3 py-1.5 whitespace-nowrap transition ${
-                createdTab === "pending" 
-                  ? "border-b-2 border-blue-600 text-blue-600 font-medium" 
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
+              onClick={() => setCreatedStatusFilter("Active")}
+              className={getCreatedStatusButtonClass("Active")}
             >
-              Pending/InProgress ({createdPendingCount})
+              Active (Pending & In Progress) ({createdActiveCount})
             </button>
+            
             <button
-              onClick={() => setCreatedTab("completed")}
-              className={`px-3 py-1.5 whitespace-nowrap transition ${
-                createdTab === "completed" 
-                  ? "border-b-2 border-blue-600 text-blue-600 font-medium" 
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
+              onClick={() => setCreatedStatusFilter("Done")}
+              className={getCreatedStatusButtonClass("Done")}
             >
               Completed ({createdCompletedCount})
             </button>
+            
             <button
-              onClick={() => setCreatedTab("approved")}
-              className={`px-3 py-1.5 whitespace-nowrap transition ${
-                createdTab === "approved" 
-                  ? "border-b-2 border-blue-600 text-blue-600 font-medium" 
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
+              onClick={() => setCreatedStatusFilter("Approved")}
+              className={getCreatedStatusButtonClass("Approved")}
             >
               Approved ({createdApprovedCount})
+            </button>
+
+            <button
+              onClick={() => setCreatedStatusFilter("")}
+              className={getCreatedStatusButtonClass("")}
+            >
+              All ({uniqueCreatedTotal})
             </button>
           </div>
 
@@ -727,7 +766,10 @@ export default function SupportTicket() {
 
             {!createdTicketsLoading && groupedCreated.length === 0 && (
               <div className="text-gray-500 text-center py-6 bg-white rounded-lg shadow-sm text-sm">
-                No tickets in this section
+                {createdStatusFilter === "Active" ? "No active tickets" :
+                 createdStatusFilter === "Done" ? "No completed tickets" :
+                 createdStatusFilter === "Approved" ? "No approved tickets" :
+                 "No tickets available"}
               </div>
             )}
 
@@ -819,8 +861,8 @@ export default function SupportTicket() {
                         </button>
                       )}
 
-                      {/* For Created view - Completed tab: Show Approve/Reject dropdown */}
-                      {createdTab === "completed" && group.Status === "Done" && (
+                      {/* For Created view - Completed filter: Show Approve/Reject dropdown */}
+                      {createdStatusFilter === "Done" && group.Status === "Done" && (
                         <div className="relative">
                           <button
                             onClick={() => setShowDropdown({ ...showDropdown, [group.Issue]: !showDropdown[group.Issue] })}
@@ -866,8 +908,8 @@ export default function SupportTicket() {
                         </div>
                       )}
                       
-                      {/* Show approved badge in approved tab */}
-                      {createdTab === "approved" && group.Taskcompletedapproval === "Approved" && (
+                      {/* Show approved badge in approved filter */}
+                      {createdStatusFilter === "Approved" && group.Taskcompletedapproval === "Approved" && (
                         <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-medium">
                           ✓ Approved
                         </span>
