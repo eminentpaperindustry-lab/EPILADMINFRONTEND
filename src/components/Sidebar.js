@@ -136,7 +136,7 @@ export default function Sidebar({ mobile }) {
            <MenuItem to="/help-ticket" icon={FaLifeRing} count={helpTicketCount}>
           Help Ticket
         </MenuItem>
-        <MenuItem to="/support-ticket" icon={FaHeadset} count={supportTicketCount}>
+        <MenuItem to="/support-ticket" icon={FaHeadset} count={supportTicketCount/3}>
           Support Ticket
         </MenuItem>
      

@@ -541,11 +541,11 @@ export default function SupportTicket() {
                         <span className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono whitespace-nowrap">
                           {group.TicketID}
                         </span>
-                        {group.count > 1 && (
+                        {/* {group.count > 1 && (
                           <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded whitespace-nowrap">
                             {group.count} tickets
                           </span>
-                        )}
+                        )} */}
                         <span className="font-medium text-sm line-clamp-2 flex-1">
                           {group.Issue}
                         </span>
