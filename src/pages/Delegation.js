@@ -739,28 +739,112 @@ Thanks`
     return nameA.localeCompare(nameB);
   });
 
-  const filteredTasks = sortedTasks.filter((t) => {
-    if (activeTab === "pending") {
-      return (
-        t.Status !== "Completed" &&
-        (!t.Taskcompletedapproval ||
-          t.Taskcompletedapproval === "Pending" ||
-          t.Taskcompletedapproval === "NotApproved")
-      );
-    } else if (activeTab === "completed") {
-      return (
-        t.Status === "Completed" &&
-        (!t.Taskcompletedapproval ||
-          t.Taskcompletedapproval === "Pending" ||
-          t.Taskcompletedapproval === "NotApproved")
-      );
-    } else if (activeTab === "approved") {
-      return t.Status === "Completed" && t.Taskcompletedapproval === "Approved";
-    } else if (activeTab === "Today_Followup") {
-      return t.Deadline <= formatDateDDMMYYYYHHMMSS() && t.Status !== "Completed";
-    }
-    return false;
-  });
+
+  // ✅ Convert "dd/mm/yyyy hh:mm:ss" → Date object (IST safe)
+function parseDDMMYYYY(dateStr) {
+  if (!dateStr) return null;
+
+  try {
+    const [datePart, timePart] = dateStr.split(" ");
+    const [dd, mm, yyyy] = datePart.split("/");
+    const [hh = "00", min = "00", ss = "00"] = (timePart || "").split(":");
+
+    return new Date(
+      Number(yyyy),
+      Number(mm) - 1,
+      Number(dd),
+      Number(hh),
+      Number(min),
+      Number(ss)
+    );
+  } catch (err) {
+    console.error("Date parse error:", err);
+    return null;
+  }
+}
+
+// ✅ Check same date (ignore time)
+function isSameDay(d1, d2) {
+  if (!d1 || !d2) return false;
+
+  return (
+    d1.getDate() === d2.getDate() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getFullYear() === d2.getFullYear()
+  );
+}
+
+// ✅ Current IST date
+function getCurrentISTDate() {
+  const now = new Date();
+
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  const istOffset = 5.5 * 60 * 60 * 1000;
+
+  return new Date(utc + istOffset);
+}
+
+// ✅ MAIN FILTER LOGIC
+const now = getCurrentISTDate();
+
+const filteredTasks = sortedTasks.filter((t) => {
+  const deadlineDate = parseDDMMYYYY(t.Deadline);
+
+  if (activeTab === "pending") {
+    return (
+      t.Status !== "Completed" &&
+      (!t.Taskcompletedapproval ||
+        t.Taskcompletedapproval === "Pending" ||
+        t.Taskcompletedapproval === "NotApproved")
+    );
+  } 
+  else if (activeTab === "completed") {
+    return (
+      t.Status === "Completed" &&
+      (!t.Taskcompletedapproval ||
+        t.Taskcompletedapproval === "Pending" ||
+        t.Taskcompletedapproval === "NotApproved")
+    );
+  } 
+  else if (activeTab === "approved") {
+    return (
+      t.Status === "Completed" &&
+      t.Taskcompletedapproval === "Approved"
+    );
+  } 
+  else if (activeTab === "Today_Followup") {
+    return (
+      deadlineDate &&
+      isSameDay(deadlineDate, now) && // ✅ sirf aaj ki date match hogi
+      t.Status !== "Completed"
+    );
+  }
+
+  return false;
+});
+
+  // const filteredTasks = sortedTasks.filter((t) => {
+  //   if (activeTab === "pending") {
+  //     return (
+  //       t.Status !== "Completed" &&
+  //       (!t.Taskcompletedapproval ||
+  //         t.Taskcompletedapproval === "Pending" ||
+  //         t.Taskcompletedapproval === "NotApproved")
+  //     );
+  //   } else if (activeTab === "completed") {
+  //     return (
+  //       t.Status === "Completed" &&
+  //       (!t.Taskcompletedapproval ||
+  //         t.Taskcompletedapproval === "Pending" ||
+  //         t.Taskcompletedapproval === "NotApproved")
+  //     );
+  //   } else if (activeTab === "approved") {
+  //     return t.Status === "Completed" && t.Taskcompletedapproval === "Approved";
+  //   } else if (activeTab === "Today_Followup") {
+  //     return t.Deadline <= formatDateDDMMYYYYHHMMSS() && t.Status !== "Completed";
+  //   }
+  //   return false;
+  // });
 
   return (
     <div className="p-4 max-w-4xl mx-auto">
