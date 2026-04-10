@@ -740,7 +740,7 @@ Thanks`
   });
 
 
-  // ✅ Convert "dd/mm/yyyy hh:mm:ss" → Date object (IST safe)
+  // ✅ Convert "dd/mm/yyyy hh:mm:ss" → Date
 function parseDDMMYYYY(dateStr) {
   if (!dateStr) return null;
 
@@ -763,29 +763,14 @@ function parseDDMMYYYY(dateStr) {
   }
 }
 
-// ✅ Check same date (ignore time)
-function isSameDay(d1, d2) {
-  if (!d1 || !d2) return false;
-
-  return (
-    d1.getDate() === d2.getDate() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getFullYear() === d2.getFullYear()
-  );
-}
-
-// ✅ Current IST date
-function getCurrentISTDate() {
+// ✅ Get today's date WITHOUT time (important)
+function getTodayStart() {
   const now = new Date();
-
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  const istOffset = 5.5 * 60 * 60 * 1000;
-
-  return new Date(utc + istOffset);
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-// ✅ MAIN FILTER LOGIC
-const now = getCurrentISTDate();
+// ✅ MAIN FILTER
+const today = getTodayStart();
 
 const filteredTasks = sortedTasks.filter((t) => {
   const deadlineDate = parseDDMMYYYY(t.Deadline);
@@ -812,10 +797,18 @@ const filteredTasks = sortedTasks.filter((t) => {
       t.Taskcompletedapproval === "Approved"
     );
   } 
+  //fix
   else if (activeTab === "Today_Followup") {
+    if (!deadlineDate) return false;
+
+    const deadlineOnlyDate = new Date(
+      deadlineDate.getFullYear(),
+      deadlineDate.getMonth(),
+      deadlineDate.getDate()
+    );
+
     return (
-      deadlineDate &&
-      isSameDay(deadlineDate, now) && // ✅ sirf aaj ki date match hogi
+      deadlineOnlyDate <= today &&   // ✅ aaj + past
       t.Status !== "Completed"
     );
   }
