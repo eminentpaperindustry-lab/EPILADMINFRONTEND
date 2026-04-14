@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { FaTasks, FaClipboardList, FaLifeRing, FaHeadset, FaBars, FaTimes } from "react-icons/fa";
+import { FaTasks, FaClipboardList, FaLifeRing, FaHeadset, FaBars, FaTimes, FaCodeBranch } from "react-icons/fa";
 import axios from "axios";
 
-// MenuItem Component for displaying the count with the badge
+// MenuItem Component
 const MenuItem = ({ to, children, icon: Icon, onClick, count }) => (
   <NavLink
     to={to}
@@ -26,52 +26,92 @@ const MenuItem = ({ to, children, icon: Icon, onClick, count }) => (
   </NavLink>
 );
 
+// Group tickets by Issue for counting
+const getGroupedTicketsForCount = (tickets) => {
+  const grouped = {};
+  
+  tickets.forEach(ticket => {
+    if (!grouped[ticket.Issue]) {
+      grouped[ticket.Issue] = {
+        Issue: ticket.Issue,
+        tickets: [ticket],
+        Status: ticket.Status,
+        Taskcompletedapproval: ticket.Taskcompletedapproval || "Pending"
+      };
+    } else {
+      grouped[ticket.Issue].tickets.push(ticket);
+      if (ticket.Taskcompletedapproval === "Approved") {
+        grouped[ticket.Issue].Taskcompletedapproval = "Approved";
+      }
+    }
+  });
+  
+  return Object.values(grouped);
+};
+
+const getUniqueCounts = (tickets) => {
+  const grouped = getGroupedTicketsForCount(tickets);
+  const active = grouped.filter(g => g.Status === "Pending" || g.Status === "InProgress").length;
+  const completed = grouped.filter(g => g.Status === "Done" && g.Taskcompletedapproval !== "Approved").length;
+  const approved = grouped.filter(g => g.Status === "Done" && g.Taskcompletedapproval === "Approved").length;
+  return { active, completed, approved, total: grouped.length };
+};
+
 export default function Sidebar({ mobile }) {
   const [isOpen, setIsOpen] = useState(false);
   const [helpTicketCount, setHelpTicketCount] = useState(0);
   const [supportTicketCount, setSupportTicketCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [version, setVersion] = useState("1.0.0");
 
   const toggleSidebar = () => setIsOpen(!isOpen);
   const closeSidebar = () => setIsOpen(false);
 
-  // Function to fetch tickets and update the counts
+  // Load version from package.json
+  useEffect(() => {
+    fetch('/version.json')
+      .then(res => res.json())
+      .then(data => setVersion(data.version))
+      .catch(() => setVersion("1.0.0"));
+  }, []);
+
+  // Load tickets count
   const loadTickets = async () => {
     try {
-      setLoading(true);  // Start loading state
+      setLoading(true);
       const token = localStorage.getItem("token");
       if (!token) return;
 
-      const authHeader = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
+      const authHeader = { headers: { Authorization: `Bearer ${token}` } };
 
       const [supportRes, helpRes] = await Promise.all([
         axios.get(`${process.env.REACT_APP_BASE_URL}/api/support-tickets/all`, authHeader),
         axios.get(`${process.env.REACT_APP_BASE_URL}/api/helpTickets/all`, authHeader),
       ]);
 
-      const activeSupport = (supportRes.data.tickets || []).filter((t) => t.Status !== "Done");
-      const activeHelp = (helpRes.data.tickets || []).filter((t) => t.Status !== "Done");
+      const supportTickets = supportRes.data.tickets || [];
+      const helpTickets = helpRes.data.tickets || [];
 
-      setSupportTicketCount(activeSupport.length);
-      setHelpTicketCount(activeHelp.length);
+      const supportGrouped = getGroupedTicketsForCount(supportTickets);
+      const helpGrouped = getGroupedTicketsForCount(helpTickets);
+
+      const activeSupportCount = supportGrouped.filter(g => g.Status === "Pending" || g.Status === "InProgress").length;
+      const activeHelpCount = helpGrouped.filter(g => g.Status === "Pending" || g.Status === "InProgress").length;
+
+      setSupportTicketCount(activeSupportCount);
+      setHelpTicketCount(activeHelpCount);
+      
     } catch (err) {
-      console.error("Failed to load tickets:", err.response ? err.response.data : err);
+      console.error("Failed to load tickets:", err);
     } finally {
-      setLoading(false); // Stop loading state after API call
+      setLoading(false);
     }
   };
 
-  // Call loadTickets on mount and every 15 minutes
   useEffect(() => {
-    loadTickets(); // initial load
-
-    const interval = setInterval(() => {
-      loadTickets();
-    }, 900000); // 15 minutes in ms
-
-    return () => clearInterval(interval); // cleanup on unmount
+    loadTickets();
+    const interval = setInterval(() => loadTickets(), 900000);
+    return () => clearInterval(interval);
   }, []);
 
   // Mobile Sidebar
@@ -86,7 +126,7 @@ export default function Sidebar({ mobile }) {
         </button>
 
         <aside
-          className={`fixed top-0 left-0 h-full w-64 bg-gray-900 text-white z-[90] transform transition-transform duration-300 ${
+          className={`fixed top-0 left-0 h-full w-64 bg-gray-900 text-white z-[90] transform transition-transform duration-300 flex flex-col ${
             isOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -100,19 +140,27 @@ export default function Sidebar({ mobile }) {
             </div>
           </div>
 
-          <nav className="p-6 space-y-2">
-                    <MenuItem to="/dashboard" icon={FaTasks} count={0}>Dashboard</MenuItem>
-            
+          <nav className="flex-1 p-6 space-y-2">
+            <MenuItem to="/dashboard" icon={FaTasks} count={0}>Dashboard</MenuItem>
             <MenuItem to="/delegation" icon={FaTasks} onClick={closeSidebar}>Delegation</MenuItem>
             <MenuItem to="/checklist" icon={FaClipboardList} onClick={closeSidebar}>Checklist</MenuItem>
-              <MenuItem to="/help-ticket" icon={FaLifeRing} onClick={closeSidebar} count={helpTicketCount}>
+            <MenuItem to="/help-ticket" icon={FaLifeRing} onClick={closeSidebar} count={helpTicketCount}>
               Help Ticket
             </MenuItem>
             <MenuItem to="/support-ticket" icon={FaHeadset} onClick={closeSidebar} count={supportTicketCount}>
               Support Ticket
             </MenuItem>
-          
           </nav>
+
+          {/* ✅ VERSION AT BOTTOM - MOBILE */}
+          <div className="p-4 border-t border-gray-800 text-center">
+            <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+              <FaCodeBranch className="w-3 h-3" />
+              <span>v{version}</span>
+              <span className="mx-1">•</span>
+              <span>© 2024</span>
+            </div>
+          </div>
         </aside>
 
         {isOpen && <div className="fixed inset-0 bg-black bg-opacity-40 z-[80]" onClick={closeSidebar} />}
@@ -128,19 +176,27 @@ export default function Sidebar({ mobile }) {
         <div className="text-xs text-gray-400">Tracked Performance Overview</div>
       </div>
 
-      <nav className="p-6 space-y-2">
-                <MenuItem to="/dashboard" icon={FaTasks} count={0}>Dashboard</MenuItem>
-        
+      <nav className="flex-1 p-6 space-y-2">
+        <MenuItem to="/dashboard" icon={FaTasks} count={0}>Dashboard</MenuItem>
         <MenuItem to="/delegation" icon={FaTasks} count={0}>Delegation</MenuItem>
         <MenuItem to="/checklist" icon={FaClipboardList} count={0}>Checklist</MenuItem>
-           <MenuItem to="/help-ticket" icon={FaLifeRing} count={helpTicketCount}>
+        <MenuItem to="/help-ticket" icon={FaLifeRing} count={helpTicketCount}>
           Help Ticket
         </MenuItem>
-        <MenuItem to="/support-ticket" icon={FaHeadset} count={supportTicketCount/3}>
+        <MenuItem to="/support-ticket" icon={FaHeadset} count={supportTicketCount}>
           Support Ticket
         </MenuItem>
-     
       </nav>
+
+      {/* ✅ VERSION AT BOTTOM - DESKTOP */}
+      <div className="p-4 border-t border-gray-800 text-center">
+        <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+          <FaCodeBranch className="w-3 h-3" />
+          <span>v{version}</span>
+          <span className="mx-1">•</span>
+          <span>© 2026</span>
+        </div>
+      </div>
     </aside>
   );
 }

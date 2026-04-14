@@ -21,12 +21,12 @@ export default function Topbar() {
   const [idleTime, setIdleTime] = useState(0);
 
   // ===== COMPLETE INDIAN FESTIVAL DATA 2026 WITH EXACT DATES =====
-  const festivals = [
+ const festivals = [
     // January 2026
     { 
       name: "Guru Gobind Singh Jayanti", 
       month: 0, // January
-      startDay: 3, // 2 days before 5 Jan
+      startDay: 5, // 2 days before 5 Jan
       endDay: 5,
       message: "⚔️ Guru Gobind Singh Jayanti - Warrior Saint! ⚔️",
       bgColor: "#f97316", // Orange
@@ -36,7 +36,7 @@ export default function Topbar() {
     { 
       name: "Lohri", 
       month: 0,
-      startDay: 11, // 2 days before 13 Jan
+      startDay: 13, // 2 days before 13 Jan
       endDay: 13,
       message: "🔥 Happy Lohri! Harvest Festival Celebration! 🔥",
       bgColor: "#f97316", // Orange
@@ -46,7 +46,7 @@ export default function Topbar() {
     { 
       name: "Makar Sankranti", 
       month: 0,
-      startDay: 12, // 2 days before 14 Jan
+      startDay: 15, // 2 days before 14 Jan
       endDay: 14,
       message: "🪁 Happy Makar Sankranti! Kite Flying Festival! 🪁",
       bgColor: "#fbbf24", // Golden
@@ -56,7 +56,7 @@ export default function Topbar() {
     { 
       name: "Vasant Panchmi", 
       month: 0,
-      startDay: 21, // 2 days before 23 Jan
+      startDay: 23, // 2 days before 23 Jan
       endDay: 23,
       message: "📚 Happy Vasant Panchmi! Goddess Saraswati Puja! 📚",
       bgColor: "#fde68a", // Light Yellow
@@ -66,7 +66,7 @@ export default function Topbar() {
     { 
       name: "Republic Day", 
       month: 0,
-      startDay: 24, // 2 days before 26 Jan
+      startDay: 26, // 2 days before 26 Jan
       endDay: 26,
       message: "🇮🇳 Happy Republic Day 2026! Jai Hind! 🇮🇳",
       bgColor: "#f97316", // Orange
@@ -78,7 +78,7 @@ export default function Topbar() {
     { 
       name: "Mahashivratri", 
       month: 1, // February
-      startDay: 13, // 2 days before 15 Feb
+      startDay: 15, // 2 days before 15 Feb
       endDay: 15,
       message: "🕉️ Happy Mahashivratri! Har Har Mahadev! 🕉️",
       bgColor: "#a855f7", // Purple
@@ -90,7 +90,7 @@ export default function Topbar() {
     { 
       name: "Holi", 
       month: 2, // March
-      startDay: 2, // 2 days before 4 March
+      startDay: 4, // 2 days before 4 March
       endDay: 4,
       message: "🌈 Happy Holi! Festival of Colors! 🌈",
       bgColor: "#f43f5e", // Pink/Rose
@@ -100,7 +100,7 @@ export default function Topbar() {
     { 
       name: "Gudi Padwa", 
       month: 2,
-      startDay: 17, // 2 days before 19 March
+      startDay: 19, // 2 days before 19 March
       endDay: 19,
       message: "🏵️ Happy Gudi Padwa! Marathi New Year! 🏵️",
       bgColor: "#f59e0b", // Amber
@@ -110,7 +110,7 @@ export default function Topbar() {
     { 
       name: "Eid", 
       month: 2,
-      startDay: 18, // 2 days before 20 March
+      startDay: 20, // 2 days before 20 March
       endDay: 20,
       message: "🌙 Eid Mubarak! Peace & Prosperity! 🌙",
       bgColor: "#059669", // Green
@@ -120,7 +120,7 @@ export default function Topbar() {
     { 
       name: "World Packaging Day", 
       month: 2,
-      startDay: 22, // 2 days before 24 March
+      startDay: 24, // 2 days before 24 March
       endDay: 24,
       message: "📦 World Packaging Day - Sustainable Packaging! 📦",
       bgColor: "#10b981", // Green
@@ -130,7 +130,7 @@ export default function Topbar() {
     { 
       name: "Ram Navmi", 
       month: 2,
-      startDay: 24, // 2 days before 26 March
+      startDay: 26, // 2 days before 26 March
       endDay: 26,
       message: "🕊️ Happy Ram Navmi! Jai Shri Ram! 🕊️",
       bgColor: "#d97706", // Orange
@@ -140,7 +140,7 @@ export default function Topbar() {
     { 
       name: "Mahavir Jayanti", 
       month: 2,
-      startDay: 29, // 2 days before 31 March
+      startDay: 31, // 2 days before 31 March
       endDay: 31,
       message: "🕉️ Mahavir Jayanti - Jain Festival! 🕉️",
       bgColor: "#fbbf24", // Golden
@@ -152,7 +152,7 @@ export default function Topbar() {
     { 
       name: "Hanuman Jayanti", 
       month: 3, // April
-      startDay: 31, // 2 days before 2 April (March 31)
+      startDay: 2, // 2 days before 2 April (March 31)
       endDay: 2,
       message: "🙏 Happy Hanuman Jayanti! Jai Bajrang Bali! 🙏",
       bgColor: "#ea580c", // Orange
@@ -162,7 +162,7 @@ export default function Topbar() {
     { 
       name: "Baisakhi", 
       month: 3,
-      startDay: 12, // 2 days before 14 April
+      startDay: 14, // 2 days before 14 April
       endDay: 14,
       message: "🌾 Happy Baisakhi! Punjabi New Year! 🌾",
       bgColor: "#fbbf24", // Golden
@@ -172,7 +172,7 @@ export default function Topbar() {
     { 
       name: "Ambedkar Jayanti", 
       month: 3,
-      startDay: 12, // 2 days before 14 April
+      startDay: 14, // 2 days before 14 April
       endDay: 14,
       message: "📚 Dr. B.R. Ambedkar Jayanti - Equality & Justice! 📚",
       bgColor: "#3b82f6", // Blue
@@ -182,7 +182,7 @@ export default function Topbar() {
     { 
       name: "Akshay Tritya", 
       month: 3,
-      startDay: 17, // 2 days before 19 April
+      startDay: 19, // 2 days before 19 April
       endDay: 19,
       message: "💰 Happy Akshay Tritya - Auspicious Day! 💰",
       bgColor: "#f59e0b", // Amber
@@ -194,7 +194,7 @@ export default function Topbar() {
     { 
       name: "Buddha Purnima", 
       month: 4, // May
-      startDay: 29, // 2 days before 1 May (April 29)
+      startDay: 1, // 2 days before 1 May (April 29)
       endDay: 1,
       message: "🪷 Buddha Purnima - Peace & Enlightenment! 🪷",
       bgColor: "#fbbf24", // Golden
@@ -206,7 +206,7 @@ export default function Topbar() {
     { 
       name: "World Environment Day", 
       month: 5, // June
-      startDay: 3, // 2 days before 5 June
+      startDay: 5, // 2 days before 5 June
       endDay: 5,
       message: "🌍 World Environment Day - Save Our Planet! 🌍",
       bgColor: "#16a34a", // Green
@@ -218,7 +218,7 @@ export default function Topbar() {
     { 
       name: "Guru Purnima", 
       month: 6, // July
-      startDay: 27, // 2 days before 29 July
+      startDay: 29, // 2 days before 29 July
       endDay: 29,
       message: "🙏 Guru Purnima - Honor Your Teachers! 🙏",
       bgColor: "#a855f7", // Purple
@@ -230,7 +230,7 @@ export default function Topbar() {
     { 
       name: "Independence Day", 
       month: 7, // August
-      startDay: 13, // 2 days before 15 Aug
+      startDay: 15, // 2 days before 15 Aug
       endDay: 15,
       message: "🇮🇳 Happy Independence Day! Celebrate Freedom! 🇮🇳",
       bgColor: "#16a34a", // Green
@@ -240,7 +240,7 @@ export default function Topbar() {
     { 
       name: "Raksha Bandhan", 
       month: 7,
-      startDay: 26, // 2 days before 28 Aug
+      startDay: 28, // 2 days before 28 Aug
       endDay: 28,
       message: "🎀 Happy Raksha Bandhan! Bond of Love! 🎀",
       bgColor: "#db2777", // Pink
@@ -252,7 +252,7 @@ export default function Topbar() {
     { 
       name: "Janmashtami", 
       month: 8, // September
-      startDay: 2, // 2 days before 4 Sept
+      startDay: 4, // 2 days before 4 Sept
       endDay: 4,
       message: "🎶 Happy Janmashtami! Jai Shri Krishna! 🎶",
       bgColor: "#3b82f6", // Blue
@@ -262,7 +262,7 @@ export default function Topbar() {
     { 
       name: "Teacher's Day", 
       month: 8,
-      startDay: 3, // 2 days before 5 Sept
+      startDay: 5, // 2 days before 5 Sept
       endDay: 5,
       message: "📚 Happy Teacher's Day! Thank You Teachers! 📚",
       bgColor: "#f43f5e", // Pink
@@ -272,7 +272,7 @@ export default function Topbar() {
     { 
       name: "Ganesh Chaturthi", 
       month: 8,
-      startDay: 12, // 2 days before 14 Sept
+      startDay: 14, // 2 days before 14 Sept
       endDay: 14,
       message: "🐘 Ganpati Bappa Morya! Happy Ganesh Chaturthi! 🐘",
       bgColor: "#f97316", // Orange
@@ -284,7 +284,7 @@ export default function Topbar() {
     { 
       name: "Gandhi Jayanti", 
       month: 9, // October
-      startDay: 30, // 2 days before 2 Oct (Sept 30)
+      startDay: 2, // 2 days before 2 Oct (Sept 30)
       endDay: 2,
       message: "🕊️ Gandhi Jayanti - Peace & Non-violence! 🕊️",
       bgColor: "#64748b", // Slate
@@ -294,7 +294,7 @@ export default function Topbar() {
     { 
       name: "Navratri", 
       month: 9,
-      startDay: 9, // 2 days before 11 Oct
+      startDay: 11, // 2 days before 11 Oct
       endDay: 11,
       message: "💃 Happy Navratri! Nine Nights of Dance! 💃",
       bgColor: "#f97316", // Orange
@@ -302,19 +302,9 @@ export default function Topbar() {
       icon: "💃"
     },
     { 
-      name: "Maharaja Agrasen Jayanti", 
-      month: 9,
-      startDay: 9, // 2 days before 11 Oct
-      endDay: 11,
-      message: "👑 Maharaja Agrasen Jayanti - Legacy of Unity! 👑",
-      bgColor: "#fbbf24", // Golden
-      textColor: "#1e293b",
-      icon: "👑"
-    },
-    { 
       name: "Durga Ashtami", 
       month: 9,
-      startDay: 17, // 2 days before 19 Oct
+      startDay: 19, // 2 days before 19 Oct
       endDay: 19,
       message: "🌺 Durga Ashtami - Maa Durga Puja! 🌺",
       bgColor: "#ea580c", // Orange
@@ -324,7 +314,7 @@ export default function Topbar() {
     { 
       name: "Maha Navami", 
       month: 9,
-      startDay: 18, // 2 days before 20 Oct
+      startDay: 20, // 2 days before 20 Oct
       endDay: 20,
       message: "🪔 Maha Navami - Victory of Good! 🪔",
       bgColor: "#f97316", // Orange
@@ -346,7 +336,7 @@ export default function Topbar() {
     { 
       name: "Dhanteras", 
       month: 10, // November
-      startDay: 4, // 2 days before 6 Nov
+      startDay: 6, // 2 days before 6 Nov
       endDay: 6,
       message: "💰 Happy Dhanteras! Wealth & Prosperity! 💰",
       bgColor: "#f59e0b", // Amber
@@ -356,7 +346,7 @@ export default function Topbar() {
     { 
       name: "Lakshmi Puja", 
       month: 10,
-      startDay: 6, // 2 days before 8 Nov
+      startDay: 8, // 2 days before 8 Nov
       endDay: 8,
       message: "🪔 Lakshmi Puja - Welcome Goddess Lakshmi! 🪔",
       bgColor: "#fbbf24", // Golden
@@ -366,7 +356,7 @@ export default function Topbar() {
     { 
       name: "Diwali", 
       month: 10,
-      startDay: 6, // 2 days before 8 Nov
+      startDay: 8, // 2 days before 8 Nov
       endDay: 8,
       message: "🪔 Happy Diwali! Festival of Lights! 🪔",
       bgColor: "#fbbf24", // Golden
@@ -376,7 +366,7 @@ export default function Topbar() {
     { 
       name: "Govardhan Puja", 
       month: 10,
-      startDay: 7, // 2 days before 9 Nov
+      startDay: 9, // 2 days before 9 Nov
       endDay: 9,
       message: "⛰️ Govardhan Puja - Annakut Festival! ⛰️",
       bgColor: "#22c55e", // Green
@@ -386,7 +376,7 @@ export default function Topbar() {
     { 
       name: "Bhaiya Dooj", 
       month: 10,
-      startDay: 9, // 2 days before 11 Nov
+      startDay: 11, // 2 days before 11 Nov
       endDay: 11,
       message: "🤝 Happy Bhaiya Dooj! Sibling Bond! 🤝",
       bgColor: "#ec4899", // Pink
@@ -396,7 +386,7 @@ export default function Topbar() {
     { 
       name: "Labh Pancham", 
       month: 10,
-      startDay: 12, // 2 days before 14 Nov
+      startDay: 14, // 2 days before 14 Nov
       endDay: 14,
       message: "💰 Labh Pancham - Auspicious Beginnings! 💰",
       bgColor: "#f59e0b", // Amber
@@ -406,7 +396,7 @@ export default function Topbar() {
     { 
       name: "Guru Nanak Jayanti", 
       month: 10,
-      startDay: 12, // 2 days before 14 Nov
+      startDay: 14, // 2 days before 14 Nov
       endDay: 14,
       message: "🙏 Guru Nanak Jayanti - Waheguru! 🙏",
       bgColor: "#fbbf24", // Golden
@@ -416,7 +406,7 @@ export default function Topbar() {
     { 
       name: "Children's Day", 
       month: 10,
-      startDay: 12, // 2 days before 14 Nov
+      startDay: 14, // 2 days before 14 Nov
       endDay: 14,
       message: "🧒 Happy Children's Day! Future of India! 🧒",
       bgColor: "#3b82f6", // Blue
@@ -426,7 +416,7 @@ export default function Topbar() {
     { 
       name: "Chhath Puja", 
       month: 10,
-      startDay: 19, // 2 days before 21 Nov
+      startDay: 21, // 2 days before 21 Nov
       endDay: 21,
       message: "🌅 Happy Chhath Puja! Sun God Worship! 🌅",
       bgColor: "#f97316", // Orange
@@ -438,7 +428,7 @@ export default function Topbar() {
     { 
       name: "Merry Christmas", 
       month: 11, // December
-      startDay: 23, // 2 days before 25 Dec
+      startDay: 25, // 2 days before 25 Dec
       endDay: 25,
       message: "🎄 Merry Christmas! Joy to the World! 🎄",
       bgColor: "#dc2626", // Red
@@ -450,7 +440,7 @@ export default function Topbar() {
     { 
       name: "New Year", 
       month: 0, // January 2027
-      startDay: 30, // 2 days before (Dec 30, 2026)
+      startDay: 1, // 2 days before (Dec 30, 2026)
       endDay: 1,
       message: "🎉 Happy New Year 2027! Welcome 2027! 🎉",
       bgColor: "#2563eb", // Blue
