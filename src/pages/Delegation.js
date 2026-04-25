@@ -67,6 +67,50 @@ export default function Delegation() {
     return `${dd}/${mm}/${yyyy} ${hh}:${min}:${ss}`;
   }
 
+  // ✅ Convert "dd/mm/yyyy" or "dd/mm/yyyy hh:mm:ss" → Date object
+  function parseDDMMYYYY(dateStr) {
+    if (!dateStr) return null;
+
+    try {
+      const [datePart, timePart] = dateStr.split(" ");
+      const [dd, mm, yyyy] = datePart.split("/");
+      const [hh = "00", min = "00", ss = "00"] = (timePart || "").split(":");
+
+      return new Date(
+        Number(yyyy),
+        Number(mm) - 1,
+        Number(dd),
+        Number(hh),
+        Number(min),
+        Number(ss)
+      );
+    } catch (err) {
+      console.error("Date parse error:", err);
+      return null;
+    }
+  }
+
+  // ✅ Get today's date WITHOUT time (for accurate date comparison)
+  function getTodayStart() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+
+  // ✅ Check if a date is today or in the past (compares year, month, day)
+  function isTodayOrPast(deadlineDateStr) {
+    const deadlineDate = parseDDMMYYYY(deadlineDateStr);
+    if (!deadlineDate) return false;
+    
+    const today = getTodayStart();
+    const deadlineOnlyDate = new Date(
+      deadlineDate.getFullYear(),
+      deadlineDate.getMonth(),
+      deadlineDate.getDate()
+    );
+    
+    return deadlineOnlyDate <= today;
+  }
+
   // ----------------------- Download Report
   const downloadDelegationReport = () => {
     if (!selectedEmp) {
@@ -300,10 +344,10 @@ export default function Delegation() {
     }
 
     try {
-      const pending = tasks.filter(
-        t =>
-          t.Deadline <= formatDateDDMMYYYYHHMMSS() &&
-          t.Status !== "Completed"
+      // ✅ FIXED: Use proper date comparison
+      const pending = tasks.filter(t => 
+        isTodayOrPast(t.Deadline) && 
+        t.Status !== "Completed"
       );
 
       if (pending.length === 0) {
@@ -376,6 +420,7 @@ export default function Delegation() {
     }
   };
 
+  // ✅ FIXED: delegationFlowup with proper date comparison
   const delegationFlowup = async () => {
     try {
       if (!selectedEmp) {
@@ -383,12 +428,11 @@ export default function Delegation() {
         return;
       }
 
-      // 🔹 Pending tasks filter FIRST (no popup yet)
-      const pending = tasks.filter(
-        t =>
-          t.Deadline <= formatDateDDMMYYYYHHMMSS() &&
-          t.Status !== "Completed" &&
-          t.Name === selectedEmp
+      // 🔹 Pending tasks with proper date comparison
+      const pending = tasks.filter(t => 
+        isTodayOrPast(t.Deadline) && 
+        t.Status !== "Completed" &&
+        t.Name === selectedEmp
       );
 
       if (pending.length === 0) {
@@ -410,7 +454,7 @@ export default function Delegation() {
       const message = encodeURIComponent(
 `Hi ${selectedEmp},
 
-👉 This is a gentle reminder regarding today’s pending & overdue tasks.
+👉 This is a gentle reminder regarding today's pending & overdue tasks.
 Kindly complete the tasks/shift the dates accordingly. ⏳📅
 
 ${taskList}
@@ -733,111 +777,56 @@ Thanks`
   };
 
   // -----------------------
-  const sortedTasks = tasks.sort((a, b) => {
+  const sortedTasks = [...tasks].sort((a, b) => {
     const nameA = (a.Name || "").toLowerCase();
     const nameB = (b.Name || "").toLowerCase();
     return nameA.localeCompare(nameB);
   });
 
+  // ✅ MAIN FILTER - UPDATED with proper date comparison
+  const today = getTodayStart();
 
-  // ✅ Convert "dd/mm/yyyy hh:mm:ss" → Date
-function parseDDMMYYYY(dateStr) {
-  if (!dateStr) return null;
+  const filteredTasks = sortedTasks.filter((t) => {
+    if (activeTab === "pending") {
+      return (
+        t.Status !== "Completed" &&
+        (!t.Taskcompletedapproval ||
+          t.Taskcompletedapproval === "Pending" ||
+          t.Taskcompletedapproval === "NotApproved")
+      );
+    } 
+    else if (activeTab === "completed") {
+      return (
+        t.Status === "Completed" &&
+        (!t.Taskcompletedapproval ||
+          t.Taskcompletedapproval === "Pending" ||
+          t.Taskcompletedapproval === "NotApproved")
+      );
+    } 
+    else if (activeTab === "approved") {
+      return (
+        t.Status === "Completed" &&
+        t.Taskcompletedapproval === "Approved"
+      );
+    } 
+    else if (activeTab === "Today_Followup") {
+      const deadlineDate = parseDDMMYYYY(t.Deadline);
+      if (!deadlineDate) return false;
 
-  try {
-    const [datePart, timePart] = dateStr.split(" ");
-    const [dd, mm, yyyy] = datePart.split("/");
-    const [hh = "00", min = "00", ss = "00"] = (timePart || "").split(":");
+      const deadlineOnlyDate = new Date(
+        deadlineDate.getFullYear(),
+        deadlineDate.getMonth(),
+        deadlineDate.getDate()
+      );
 
-    return new Date(
-      Number(yyyy),
-      Number(mm) - 1,
-      Number(dd),
-      Number(hh),
-      Number(min),
-      Number(ss)
-    );
-  } catch (err) {
-    console.error("Date parse error:", err);
-    return null;
-  }
-}
+      return (
+        deadlineOnlyDate <= today &&   // ✅ aaj + past (includes month/year properly)
+        t.Status !== "Completed"
+      );
+    }
 
-// ✅ Get today's date WITHOUT time (important)
-function getTodayStart() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
-// ✅ MAIN FILTER
-const today = getTodayStart();
-
-const filteredTasks = sortedTasks.filter((t) => {
-  const deadlineDate = parseDDMMYYYY(t.Deadline);
-
-  if (activeTab === "pending") {
-    return (
-      t.Status !== "Completed" &&
-      (!t.Taskcompletedapproval ||
-        t.Taskcompletedapproval === "Pending" ||
-        t.Taskcompletedapproval === "NotApproved")
-    );
-  } 
-  else if (activeTab === "completed") {
-    return (
-      t.Status === "Completed" &&
-      (!t.Taskcompletedapproval ||
-        t.Taskcompletedapproval === "Pending" ||
-        t.Taskcompletedapproval === "NotApproved")
-    );
-  } 
-  else if (activeTab === "approved") {
-    return (
-      t.Status === "Completed" &&
-      t.Taskcompletedapproval === "Approved"
-    );
-  } 
-  //fix
-  else if (activeTab === "Today_Followup") {
-    if (!deadlineDate) return false;
-
-    const deadlineOnlyDate = new Date(
-      deadlineDate.getFullYear(),
-      deadlineDate.getMonth(),
-      deadlineDate.getDate()
-    );
-
-    return (
-      deadlineOnlyDate <= today &&   // ✅ aaj + past
-      t.Status !== "Completed"
-    );
-  }
-
-  return false;
-});
-
-  // const filteredTasks = sortedTasks.filter((t) => {
-  //   if (activeTab === "pending") {
-  //     return (
-  //       t.Status !== "Completed" &&
-  //       (!t.Taskcompletedapproval ||
-  //         t.Taskcompletedapproval === "Pending" ||
-  //         t.Taskcompletedapproval === "NotApproved")
-  //     );
-  //   } else if (activeTab === "completed") {
-  //     return (
-  //       t.Status === "Completed" &&
-  //       (!t.Taskcompletedapproval ||
-  //         t.Taskcompletedapproval === "Pending" ||
-  //         t.Taskcompletedapproval === "NotApproved")
-  //     );
-  //   } else if (activeTab === "approved") {
-  //     return t.Status === "Completed" && t.Taskcompletedapproval === "Approved";
-  //   } else if (activeTab === "Today_Followup") {
-  //     return t.Deadline <= formatDateDDMMYYYYHHMMSS() && t.Status !== "Completed";
-  //   }
-  //   return false;
-  // });
+    return false;
+  });
 
   return (
     <div className="p-4 max-w-4xl mx-auto">
