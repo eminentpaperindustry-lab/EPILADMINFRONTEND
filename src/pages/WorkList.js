@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { getAllEmployees, getAllWorklists, createWorklist, updateWorklistAdmin, bulkUploadWorklists, downloadWorklists } from "../api/services";
+import { getAllEmployees, getAllWorklists, createWorklist, updateWorklistAdmin, bulkUploadWorklists, downloadWorklists, getAdminOccupancy } from "../api/services";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import * as XLSX from "xlsx";
-
-// PDF imports
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -37,6 +35,13 @@ export default function AdminWorkList() {
   const [bulkResult, setBulkResult] = useState(null);
   const [uploading, setUploading] = useState(false);
   
+  // Occupancy module states
+  const [showOccupancy, setShowOccupancy] = useState(false);
+  const [occupancyDate, setOccupancyDate] = useState(new Date().toISOString().slice(0,10));
+  const [occupancyData, setOccupancyData] = useState(null);
+  const [loadingOcc, setLoadingOcc] = useState(false);
+  const [sortOrder, setSortOrder] = useState("top");
+
   const bulkModalRef = useRef();
   const addModalRef = useRef();
 
@@ -54,6 +59,25 @@ export default function AdminWorkList() {
   }, []);
 
   useEffect(() => { loadEmployees(); loadWorklists(); }, [loadEmployees, loadWorklists]);
+
+  // Occupancy fetch – uses centralized service with proper baseURL + auth header
+  const fetchOccupancy = useCallback(async () => {
+    if (!showOccupancy) return;
+    setLoadingOcc(true);
+    try {
+      const res = await getAdminOccupancy(occupancyDate);
+      setOccupancyData(res.data);
+    } catch (err) {
+      toast.error("Failed to load occupancy data");
+      console.error(err);
+    } finally {
+      setLoadingOcc(false);
+    }
+  }, [occupancyDate, showOccupancy]);
+
+  useEffect(() => {
+    if (showOccupancy) fetchOccupancy();
+  }, [fetchOccupancy, showOccupancy]);
 
   const handleClickOutside = (e, modalRef, closeFn) => {
     if (modalRef.current && !modalRef.current.contains(e.target)) closeFn();
@@ -139,7 +163,6 @@ export default function AdminWorkList() {
     finally { setSaving(false); }
   };
 
-  // ✅ FIXED: Excel Sample Download
   const downloadSampleBulkUpload = () => {
     const sampleData = [
       { WorklistName: "Daily Sales Report", Frequency: "Daily", WorkingTime: "60M", ScheduleDays: "", ScheduleDates: "", TemplateLinkRemark: "https://docs.google.com/spreadsheets/d/1ABC123" },
@@ -148,7 +171,6 @@ export default function AdminWorkList() {
       { WorklistName: "Quarterly Business Review", Frequency: "Monthly", WorkingTime: "180M", ScheduleDays: "", ScheduleDates: "1,15", TemplateLinkRemark: "https://docs.google.com/presentation/d/3QRS789" },
       { WorklistName: "Annual Report", Frequency: "Yearly", WorkingTime: "240M", ScheduleDays: "", ScheduleDates: "December 25", TemplateLinkRemark: "Year end report preparation" }
     ];
-    
     const ws = XLSX.utils.json_to_sheet(sampleData);
     ws['!cols'] = [{wch:30}, {wch:12}, {wch:10}, {wch:25}, {wch:15}, {wch:55}];
     const wb = XLSX.utils.book_new();
@@ -157,20 +179,13 @@ export default function AdminWorkList() {
     toast.success("✅ Sample Bulk Upload file downloaded!");
   };
 
-  // ✅ FIXED: PDF Sample Download
   const downloadSamplePDF = () => {
     try {
-      const doc = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4'
-      });
-      
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       doc.setFontSize(16);
       doc.text("Sample Bulk Upload Format", 14, 20);
       doc.setFontSize(10);
       doc.text("Follow this exact format for bulk upload:", 14, 30);
-      
       autoTable(doc, {
         startY: 40,
         head: [["WorklistName", "Frequency", "WorkingTime", "ScheduleDays", "ScheduleDates", "TemplateLinkRemark"]],
@@ -181,18 +196,8 @@ export default function AdminWorkList() {
           ["Annual Report", "Yearly", "180M", "", "December 25", "Year end report preparation"]
         ],
         theme: "grid",
-        headStyles: { 
-          fillColor: [41, 128, 185], 
-          textColor: 255, 
-          fontSize: 9, 
-          fontStyle: 'bold',
-          halign: 'center'
-        },
-        bodyStyles: { 
-          fontSize: 8, 
-          cellPadding: 2,
-          valign: 'middle'
-        },
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontSize: 9, fontStyle: 'bold', halign: 'center' },
+        bodyStyles: { fontSize: 8, cellPadding: 2, valign: 'middle' },
         columnStyles: {
           0: { cellWidth: 40, halign: 'left' },
           1: { cellWidth: 25, halign: 'center' },
@@ -203,7 +208,6 @@ export default function AdminWorkList() {
         },
         margin: { left: 10, right: 10, top: 35 }
       });
-      
       doc.save("Sample_Bulk_Upload_Format.pdf");
       toast.success("✅ Sample PDF format downloaded!");
     } catch (err) {
@@ -212,17 +216,10 @@ export default function AdminWorkList() {
     }
   };
 
-  // ✅ FIXED: PDF Report Download
   const downloadPDFReport = () => {
     if (!worklists.length) return toast.info("No data to download");
     try {
-      const doc = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4'
-      });
-      
-      // Header
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
       doc.text("WorkList Management Report", 14, 20);
@@ -233,7 +230,6 @@ export default function AdminWorkList() {
       doc.text(`Employee Filter: ${selectedEmp === "all" ? "All Employees" : selectedEmp}`, 14, 42);
       doc.text(`Search: ${search || "None"}`, 14, 48);
       
-      // Prepare table data with proper text cleaning
       const tableData = worklists.map((wl, idx) => [
         (idx + 1).toString(),
         wl.EmployeeName || "-",
@@ -249,52 +245,28 @@ export default function AdminWorkList() {
         head: [["#", "Employee", "Worklist", "Freq", "Schedule", "Time", "Link/Remark"]],
         body: tableData,
         theme: "grid",
-        headStyles: { 
-          fillColor: [41, 128, 185], 
-          textColor: 255, 
-          fontSize: 9,
-          fontStyle: 'bold',
-          halign: 'center',
-          valign: 'middle'
-        },
-        bodyStyles: { 
-          fontSize: 8,
-          cellPadding: 3,
-          valign: 'middle'
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 245]
-        },
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontSize: 9, fontStyle: 'bold', halign: 'center', valign: 'middle' },
+        bodyStyles: { fontSize: 8, cellPadding: 3, valign: 'middle' },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
         columnStyles: {
-          0: { cellWidth: 10, halign: 'center' },      // # 
-          1: { cellWidth: 35, halign: 'left' },        // Employee
-          2: { cellWidth: 50, halign: 'left' },        // Worklist (increased)
-          3: { cellWidth: 25, halign: 'center' },      // Frequency
-          4: { cellWidth: 40, halign: 'left' },        // Schedule (increased)
-          5: { cellWidth: 20, halign: 'center' },      // Time
-          6: { cellWidth: 60, halign: 'left' }         // Link/Remark (increased)
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 35, halign: 'left' },
+          2: { cellWidth: 50, halign: 'left' },
+          3: { cellWidth: 25, halign: 'center' },
+          4: { cellWidth: 40, halign: 'left' },
+          5: { cellWidth: 20, halign: 'center' },
+          6: { cellWidth: 60, halign: 'left' }
         },
         margin: { top: 50, left: 10, right: 10, bottom: 10 },
         pageBreak: 'auto',
         rowPageBreak: 'avoid',
         didDrawPage: function(data) {
-          // Add footer on each page
           doc.setFontSize(8);
           doc.setFont("helvetica", "italic");
-          doc.text(
-            `Page ${data.pageNumber}`, 
-            doc.internal.pageSize.width - 20, 
-            doc.internal.pageSize.height - 10
-          );
-          doc.text(
-            `WorkList Management System`,
-            doc.internal.pageSize.width / 2,
-            doc.internal.pageSize.height - 10,
-            { align: 'center' }
-          );
+          doc.text(`Page ${data.pageNumber}`, doc.internal.pageSize.width - 20, doc.internal.pageSize.height - 10);
+          doc.text(`WorkList Management System`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
         }
       });
-      
       doc.save(`WorkList_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
       toast.success("PDF downloaded successfully");
     } catch (err) {
@@ -347,23 +319,17 @@ export default function AdminWorkList() {
     finally { setUploading(false); }
   };
 
-  // ✅ FIXED: Excel Download
   const handleDownload = async (type = "all") => {
     try {
       const res = await downloadWorklists({ employeeName: type === "all" ? "all" : selectedEmp });
       const data = res.data.data || [];
       if (!data.length) return toast.info("No data");
-      
       const ws = XLSX.utils.json_to_sheet(data.map(d => ({ 
-        WorklistName: d.WorklistName, 
-        Frequency: d.Frequency, 
-        WorkingTime: d.WorkingTime,
-        ScheduleDays: d.ScheduleDays || "",
-        ScheduleDates: d.ScheduleDates || "",
+        WorklistName: d.WorklistName, Frequency: d.Frequency, WorkingTime: d.WorkingTime,
+        ScheduleDays: d.ScheduleDays || "", ScheduleDates: d.ScheduleDates || "",
         TemplateLinkRemark: d.TemplateLink || d.Remark || ""
       })));
       ws['!cols'] = [{wch:30}, {wch:12}, {wch:10}, {wch:25}, {wch:15}, {wch:55}];
-      
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "WorkList");
       XLSX.writeFile(wb, `WorkList_${type}_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -375,6 +341,72 @@ export default function AdminWorkList() {
   };
 
   const closeBulkModal = () => { setShowBulk(false); setBulkData([]); setBulkResult(null); };
+
+  const downloadOccupancyPDF = () => {
+    if (!occupancyData?.occupancyList) return toast.info("No data to download");
+    try {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Work Occupancy Report", 14, 20);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Date: ${occupancyDate}`, 14, 30);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 36);
+      doc.text(`Avg Occupancy: ${occupancyData.summary.averageOccupancy}%  |  Overloaded: ${occupancyData.summary.overloadedCount}  |  Underloaded: ${occupancyData.summary.underloadedCount}  |  Total: ${occupancyData.summary.totalEmployees}`, 14, 42);
+
+      const sorted = getSortedOccupancyList();
+      const tableData = sorted.map((emp, idx) => [
+        (idx + 1).toString(),
+        emp.employeeName,
+        `${emp.assignedHours} hrs (${emp.assignedMinutes} min)`,
+        `${emp.workingHours} hrs`,
+        `${emp.occupancyPercentage}%`,
+        emp.status === 'overload' ? 'Overloaded' : emp.status === 'underload' ? 'Underloaded' : 'Balanced'
+      ]);
+
+      autoTable(doc, {
+        startY: 50,
+        head: [["#", "Employee", "Assigned Time", "Working Hours", "Occupancy", "Status"]],
+        body: tableData,
+        theme: "grid",
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontSize: 9, fontStyle: 'bold', halign: 'center' },
+        bodyStyles: { fontSize: 8, cellPadding: 3, valign: 'middle' },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        columnStyles: {
+          0: { cellWidth: 12, halign: 'center' },
+          1: { cellWidth: 45, halign: 'left' },
+          2: { cellWidth: 50, halign: 'center' },
+          3: { cellWidth: 40, halign: 'center' },
+          4: { cellWidth: 35, halign: 'center' },
+          5: { cellWidth: 35, halign: 'center' }
+        },
+        margin: { top: 50, left: 10, right: 10, bottom: 10 },
+        pageBreak: 'auto',
+        didDrawPage: function(data) {
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "italic");
+          doc.text(`Page ${data.pageNumber}`, doc.internal.pageSize.width - 20, doc.internal.pageSize.height - 10);
+          doc.text(`Occupancy Report - ${occupancyDate}`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+        }
+      });
+      doc.save(`Occupancy_Report_${occupancyDate}.pdf`);
+      toast.success("PDF downloaded successfully");
+    } catch (err) {
+      console.error("PDF Error:", err);
+      toast.error("PDF download failed: " + err.message);
+    }
+  };
+
+  const getSortedOccupancyList = () => {
+    if (!occupancyData?.occupancyList) return [];
+    const list = [...occupancyData.occupancyList];
+    if (sortOrder === "top") {
+      return list.sort((a,b) => b.occupancyPercentage - a.occupancyPercentage);
+    } else {
+      return list.sort((a,b) => a.occupancyPercentage - b.occupancyPercentage);
+    }
+  };
 
   const totalPages = Math.ceil(worklists.length / PAGE_SIZE);
   const paginatedData = worklists.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -390,6 +422,12 @@ export default function AdminWorkList() {
           <button onClick={() => setShowBulk(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold">📤 Bulk Upload</button>
           <button onClick={() => handleDownload("all")} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold">📥 Download Excel</button>
           <button onClick={downloadPDFReport} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold">📄 Download PDF</button>
+          <button
+            onClick={() => setShowOccupancy(!showOccupancy)}
+            className={`px-4 py-2 rounded-lg text-sm font-bold ${showOccupancy ? 'bg-purple-700' : 'bg-purple-600'} text-white`}
+          >
+            {showOccupancy ? '📊 Hide Occupancy' : '📊 Occupancy Analysis'}
+          </button>
         </div>
       </div>
 
@@ -464,6 +502,108 @@ export default function AdminWorkList() {
         </>
       )}
 
+      {/* OCCUPANCY MODULE UI */}
+      {showOccupancy && (
+        <div className="mt-8 bg-white rounded-xl border shadow-sm p-4">
+          <div className="flex flex-wrap justify-between items-center mb-4 gap-3">
+            <h2 className="text-lg font-black text-slate-800">📈 Occupancy Report</h2>
+            <div className="flex gap-3 items-center">
+              <input
+                type="date"
+                value={occupancyDate}
+                onChange={(e) => setOccupancyDate(e.target.value)}
+                className="border rounded-lg px-3 py-2 text-sm"
+              />
+              <button
+                onClick={() => setSortOrder(sortOrder === "top" ? "bottom" : "top")}
+                className="bg-slate-200 px-3 py-2 rounded-lg text-sm font-bold"
+              >
+                {sortOrder === "top" ? "🔽 Top to Bottom" : "🔼 Bottom to Top"}
+              </button>
+              <button onClick={fetchOccupancy} className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm">
+                Refresh
+              </button>
+              {occupancyData && (
+                <button onClick={downloadOccupancyPDF} className="bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-bold">
+                  📄 Download PDF
+                </button>
+              )}
+            </div>
+          </div>
+
+          {loadingOcc ? (
+            <div className="text-center py-10">Loading occupancy...</div>
+          ) : occupancyData ? (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-5">
+                <div className="bg-blue-50 p-3 rounded-lg text-center">
+                  <div className="text-xs text-blue-600">Avg Occupancy</div>
+                  <div className="text-2xl font-bold">{occupancyData.summary.averageOccupancy}%</div>
+                </div>
+                <div className="bg-red-50 p-3 rounded-lg text-center">
+                  <div className="text-xs text-red-600">Overloaded</div>
+                  <div className="text-2xl font-bold">{occupancyData.summary.overloadedCount}</div>
+                </div>
+                <div className="bg-amber-50 p-3 rounded-lg text-center">
+                  <div className="text-xs text-amber-600">Underloaded</div>
+                  <div className="text-2xl font-bold">{occupancyData.summary.underloadedCount}</div>
+                </div>
+                <div className="bg-green-50 p-3 rounded-lg text-center">
+                  <div className="text-xs text-green-600">Total Employees</div>
+                  <div className="text-2xl font-bold">{occupancyData.summary.totalEmployees}</div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="p-2 text-left">Rank</th>
+                      <th className="p-2 text-left">Employee</th>
+                      <th className="p-2 text-left">Assigned Time</th>
+                      <th className="p-2 text-left">Working Hours</th>
+                      <th className="p-2 text-left">Occupancy</th>
+                      <th className="p-2 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getSortedOccupancyList().map((emp, idx) => (
+                      <tr key={emp.employeeName} className="border-t hover:bg-slate-50">
+                        <td className="p-2 font-bold text-slate-400">{idx+1}.</td>
+                        <td className="p-2 font-medium">{emp.employeeName}</td>
+                        <td className="p-2">{emp.assignedHours} hrs</td>
+                        <td className="p-2">{emp.workingHours} hrs</td>
+                        <td className="p-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-24 bg-gray-200 rounded-full h-2 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${emp.occupancyPercentage > 100 ? 'bg-red-500' : emp.occupancyPercentage < 50 ? 'bg-amber-500' : 'bg-green-500'}`}
+                                style={{ width: `${Math.min(emp.occupancyPercentage, 100)}%` }}
+                              ></div>
+                            </div>
+                            <span>{emp.occupancyPercentage}%</span>
+                          </div>
+                        </td>
+                        <td className="p-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                            emp.status === 'overload' ? 'bg-red-100 text-red-700' :
+                            emp.status === 'underload' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+                          }`}>
+                            {emp.status === 'overload' ? '⚠️ Overloaded' : emp.status === 'underload' ? '⚠️ Underloaded' : '✅ Balanced'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-6 text-gray-500">Select a date and click Refresh</div>
+          )}
+        </div>
+      )}
+
       {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4" onClick={(e)=>handleClickOutside(e,addModalRef,closeModal)}>
@@ -475,14 +615,12 @@ export default function AdminWorkList() {
                 <label className="block text-xs font-bold mb-1">Worklist Name *</label>
                 <input type="text" value={form.WorklistName} onChange={e=>setForm({...form,WorklistName:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
               </div>
-              
               <div>
                 <label className="block text-xs font-bold mb-1">Frequency *</label>
                 <select value={form.Frequency} onChange={e=>{setForm({...form,Frequency:e.target.value}); setSelectedDays([]); setSelectedDates([]); setSchedule({scheduleDays:"",scheduleDates:""});}} className="w-full border rounded-lg px-3 py-2 text-sm">
                   {FREQUENCIES.map(f=><option key={f} value={f}>{f}</option>)}
                 </select>
               </div>
-              
               {form.Frequency === "Weekly" && (
                 <div>
                   <label className="block text-xs font-bold mb-1">Select Days *</label>
@@ -497,7 +635,6 @@ export default function AdminWorkList() {
                   {selectedDays.length>0 && <p className="text-xs text-blue-600 mt-1">✅ {selectedDays.join(", ")}</p>}
                 </div>
               )}
-              
               {form.Frequency === "Monthly" && (
                 <div>
                   <label className="block text-xs font-bold mb-1">Select Dates *</label>
@@ -512,7 +649,6 @@ export default function AdminWorkList() {
                   {selectedDates.length>0 && <p className="text-xs text-purple-600 mt-1">✅ {selectedDates.join(", ")}</p>}
                 </div>
               )}
-              
               {form.Frequency === "Yearly" && (
                 <div>
                   <label className="block text-xs font-bold mb-1">Select Month & Date *</label>
@@ -527,7 +663,6 @@ export default function AdminWorkList() {
                   <p className="text-xs text-orange-600 mt-1">✅ Every {yearlyMonth} {yearlyDate}</p>
                 </div>
               )}
-              
               <div>
                 <label className="block text-xs font-bold mb-1">Working Time (Minutes) *</label>
                 <select value={WORKING_TIMES.includes(form.WorkingTime)?form.WorkingTime:"custom"} onChange={e=>handleWorkingTimeChange(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm mb-2">
@@ -546,7 +681,6 @@ export default function AdminWorkList() {
                     className="w-full border rounded-lg px-3 py-2 text-sm"/>
                 }
               </div>
-              
               {!editing && (
                 <div>
                   <label className="block text-xs font-bold mb-1">Employee *</label>
@@ -556,7 +690,6 @@ export default function AdminWorkList() {
                   </select>
                 </div>
               )}
-              
               <div>
                 <label className="block text-xs font-bold mb-1">Template Link / Remark</label>
                 <textarea value={form.TemplateLinkRemark} onChange={e=>setForm({...form,TemplateLinkRemark:e.target.value})} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Paste Google Sheet link OR add remark..."/>
@@ -579,7 +712,6 @@ export default function AdminWorkList() {
           <div ref={bulkModalRef} className="bg-white rounded-xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto relative">
             <button onClick={closeBulkModal} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl">✕</button>
             <h2 className="text-lg font-black mb-4">📤 Bulk Upload Worklists</h2>
-            
             {selectedEmp === "all" ? (
               <div className="p-4 bg-amber-50 rounded-lg text-amber-700 text-center">
                 ⚠️ Please select an employee from the dropdown above first
@@ -590,26 +722,19 @@ export default function AdminWorkList() {
                   <span className="text-lg">👤</span>
                   <span>Uploading for: <strong className="text-blue-800">{selectedEmp}</strong></span>
                 </div>
-                
                 <div className="mb-4 p-4 bg-amber-50 border-2 border-amber-300 rounded-lg">
                   <p className="font-bold text-amber-800 mb-2">📋 Download Sample Format</p>
                   <div className="flex gap-3 mb-3">
-                    <button onClick={downloadSampleBulkUpload} className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex-1 text-sm font-bold">
-                      📥 Excel Sample
-                    </button>
-                    <button onClick={downloadSamplePDF} className="bg-red-600 text-white px-4 py-2 rounded-lg flex-1 text-sm font-bold">
-                      📄 PDF Sample
-                    </button>
+                    <button onClick={downloadSampleBulkUpload} className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex-1 text-sm font-bold">📥 Excel Sample</button>
+                    <button onClick={downloadSamplePDF} className="bg-red-600 text-white px-4 py-2 rounded-lg flex-1 text-sm font-bold">📄 PDF Sample</button>
                   </div>
                   <div className="text-xs text-amber-700">
                     <strong>Required Columns:</strong> WorklistName, Frequency, WorkingTime, ScheduleDays, ScheduleDates, TemplateLinkRemark
                   </div>
                 </div>
-                
                 <div className="border-2 border-dashed rounded-xl p-6 text-center mb-4 hover:bg-gray-50 transition">
                   <input type="file" accept=".xlsx,.csv,.xls" onChange={handleFileUpload} className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
                 </div>
-                
                 {bulkData.length > 0 && (
                   <div className="mb-4">
                     <p className="text-sm font-bold mb-2">📊 {bulkData.length} rows ready to upload</p>
@@ -629,7 +754,6 @@ export default function AdminWorkList() {
                     </div>
                   </div>
                 )}
-                
                 {bulkResult && (
                   <div className="mb-4 p-3 bg-slate-50 rounded-lg border">
                     <p className="text-emerald-600 font-bold">✅ Created: {bulkResult.summary?.created || 0}</p>
@@ -645,7 +769,6 @@ export default function AdminWorkList() {
                     )}
                   </div>
                 )}
-                
                 <div className="flex justify-end gap-3 mt-4">
                   <button onClick={closeBulkModal} className="px-4 py-2 bg-gray-200 rounded-lg">Close</button>
                   <button onClick={handleBulkUpload} disabled={uploading || !bulkData.length} className="px-4 py-2 bg-indigo-600 text-white rounded-lg disabled:opacity-50 font-bold">

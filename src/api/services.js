@@ -96,3 +96,7 @@ export const bulkUploadWorklists = (worklists) =>
 
 export const downloadWorklists = (params) =>
   axios.get("/worklist/download", { ...authHeader(), params });
+
+// ──── OCCUPANCY ────
+export const getAdminOccupancy = (date) =>
+  axios.get(`/worklist/admin/occupancy?date=${date}`, authHeader());
