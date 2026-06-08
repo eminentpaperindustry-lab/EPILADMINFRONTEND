@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo } from "react";
 import axios from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import axiosLib from "axios";
 
 // ============================================================
@@ -229,7 +229,7 @@ export default function Dashboard() {
       ];
     }).filter((row) => filterType !== "em" || row[row.length - 1] === "YES");
 
-    doc.autoTable({
+    autoTable(doc, {
       head: headers, body, startY: 18, theme: 'grid',
       styles: { fontSize: 5, halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0] },
       headStyles: { fillColor: [198, 224, 180], textColor: [0, 0, 0], fontStyle: 'bold' },
@@ -374,4 +374,4 @@ const SectionBlock = React.memo(({ title, data, score, formatPercent, theme }) =
       )}
     </div>
   );
-});
+}); 

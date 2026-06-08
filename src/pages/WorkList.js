@@ -3,7 +3,7 @@ import { getAllEmployees, getAllWorklists, createWorklist, updateWorklistAdmin, 
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
+import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
 const FREQUENCIES = ["Daily", "Weekly", "Monthly", "Yearly"];
@@ -348,7 +348,7 @@ export default function AdminWorkList() {
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
-      doc.text("Work Occupancy Report", 14, 20);
+      doc.text("Occupancy Report", 14, 20);
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       doc.text(`Date: ${occupancyDate}`, 14, 30);
