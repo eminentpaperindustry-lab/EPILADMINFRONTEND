@@ -100,3 +100,10 @@ export const downloadWorklists = (params) =>
 // ──── OCCUPANCY ────
 export const getAdminOccupancy = (date) =>
   axios.get(`/worklist/admin/occupancy?date=${date}`, authHeader());
+
+// ──── AI TIME SHEET & AI SHEET ────
+export const updateAITime = (id, AITime) =>
+  axios.put(`/worklist/ai-time/${id}`, { AITime }, authHeader());
+
+export const getAISheet = (params) =>
+  axios.get("/worklist/admin/ai-sheet", { ...authHeader(), params });
