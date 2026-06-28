@@ -6,10 +6,9 @@ import autoTable from "jspdf-autotable";
 import axiosLib from "axios";
 
 // ============================================================
-// MEMOIZED SUB-COMPONENTS (prevent unnecessary re-renders)
+// MEMOIZED SUB-COMPONENTS
 // ============================================================
 
-//OK
 const THEMES = {
   blue: "bg-blue-600 text-white",
   amber: "bg-amber-500 text-white",
@@ -65,7 +64,13 @@ const SingleSection = React.memo(({ title, data, showScore = false, formatPercen
 // MAIN DASHBOARD COMPONENT
 // ============================================================
 export default function Dashboard() {
-  const { user } = useContext(AuthContext);
+  const { user, token } = useContext(AuthContext);
+
+  // Check if user is Eminent admin
+  const isEminentAdmin = useMemo(() => {
+    const company = user?.company || user?.companyName || "";
+    return company === "Eminent";
+  }, [user]);
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedWeek, setSelectedWeek] = useState(1);
@@ -76,19 +81,19 @@ export default function Dashboard() {
   const [weekRange, setWeekRange] = useState({ start: "", end: "" });
   const [allDashboardData, setAllDashboardData] = useState([]);
 
-  // ================= LOAD EMPLOYEES (memoized) =================
+  // ================= LOAD EMPLOYEES =================
   const loadEmployees = useCallback(async () => {
     try {
       const res = await axios.get("/employee/all", {
-        headers: { Authorization: `Bearer ${user.token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       setEmployees(res.data || []);
     } catch (err) {
       console.error(err);
     }
-  }, [user.token]);
+  }, [token]);
 
-  // ================= LOAD DASHBOARD (memoized) =================
+  // ================= LOAD DASHBOARD =================
   const loadAllDashboard = useCallback(async () => {
     try {
       setLoading(true);
@@ -98,7 +103,7 @@ export default function Dashboard() {
           week: selectedWeek,
           selectedName: selectedEmployee === "all" ? "" : selectedEmployee,
         },
-        headers: { Authorization: `Bearer ${user.token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       setAllDashboardData(res.data.data || []);
       setWeekRange({ start: res.data.weekStart, end: res.data.weekEnd });
@@ -107,18 +112,18 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [user.token, selectedEmployee, selectedMonth, selectedWeek]);
+  }, [token, selectedEmployee, selectedMonth, selectedWeek]);
 
   // ================= EFFECTS =================
   useEffect(() => { loadEmployees(); }, [loadEmployees]);
   useEffect(() => { loadAllDashboard(); }, [loadAllDashboard]);
 
-  // ================= MEMOIZED HELPERS =================
+  // ================= SAFE FORMAT HELPERS =================
   const formatPercent = useCallback((value) => {
-    if (!value) return "-0.00%";
+    if (!value && value !== 0) return "0.00%";
     const num = parseFloat(value);
-    if (isNaN(num)) return "-0.00%";
-    return `-${num.toFixed(2)}%`;
+    if (isNaN(num)) return "0.00%";
+    return num < 0 ? `${num.toFixed(2)}%` : `-${num.toFixed(2)}%`;
   }, []);
 
   const calculateWithoutDelegation = useCallback((emp) => {
@@ -129,20 +134,286 @@ export default function Dashboard() {
     const completedWork = (checklist.completedWork || 0) + (helpAssigned.completedWork || 0) + (supportAssigned.completedWork || 0);
     const pendingWork = (checklist.pendingWork || 0) + (helpAssigned.pendingWork || 0) + (supportAssigned.pendingWork || 0);
     const onTimeWork = (checklist.onTimeWork || 0) + (helpAssigned.onTimeWork || 0) + (supportAssigned.onTimeWork || 0);
-    const pendingPercent = totalWork > 0 ? ((pendingWork / totalWork) * 100).toFixed(2) : "0.00";
-    const delayPercent = totalWork > 0 ? (((totalWork - onTimeWork) / totalWork) * 100).toFixed(2) : "0.00";
-    const overallScore = ((parseFloat(pendingPercent) * 0.80) + (parseFloat(delayPercent) * 0.20)).toFixed(2);
-    return { totalWork, completedWork, pendingWork, onTimeWork, pendingPercent: `-${pendingPercent}`, delayPercent: `-${delayPercent}`, overallScore: `-${overallScore}` };
+    const pendingPercent = totalWork > 0 ? ((pendingWork / totalWork) * 100) : 0;
+    const delayPercent = totalWork > 0 ? (((totalWork - onTimeWork) / totalWork) * 100) : 0;
+    const overallScore = ((pendingPercent * 0.80) + (delayPercent * 0.20));
+    return { 
+      totalWork, 
+      completedWork, 
+      pendingWork, 
+      onTimeWork, 
+      pendingPercent: pendingPercent > 0 ? -pendingPercent : 0,
+      delayPercent: delayPercent > 0 ? -delayPercent : 0,
+      overallScore: overallScore > 0 ? -overallScore : 0 
+    };
   }, []);
 
   const calculateDelegationOverall = useCallback((delegation) => {
     const del = delegation || {};
-    const pendingPercent = parseFloat(del.pendingPercent || 0);
-    const delayPercent = parseFloat(del.delayPercent || 0);
-    return `-${((pendingPercent * 0.80) + (delayPercent * 0.20)).toFixed(2)}`;
+    const pendingPercent = parseFloat(del.pendingPercent) || 0;
+    const delayPercent = parseFloat(del.delayPercent) || 0;
+    const overall = ((pendingPercent * 0.80) + (delayPercent * 0.20));
+    return overall > 0 ? -overall : 0;
   }, []);
 
-  // ================= WHATSAPP & PDF (same logic, kept for functionality) =================
+  // ================= EM SHEET PDF DOWNLOAD - FINAL =================
+  const downloadEMSheet = useCallback(async () => {
+    try {
+      setIsUpdating(true);
+      
+      const response = await axios.get("/em-sheet/em-sheet", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      console.log("📊 Full Response:", response.data);
+
+      if (!response.data.success) {
+        alert("Failed to fetch EM Sheet data: " + (response.data.error || "Unknown error"));
+        setIsUpdating(false);
+        return;
+      }
+
+      const employeesData = response.data.data?.employees || [];
+      const weekInfo = response.data.data?.weekInfo || "";
+      const footer = response.data.data?.footer || [];
+      
+      console.log("📊 Week Info from sheet:", weekInfo);
+      console.log("📊 Employees count:", employeesData.length);
+      console.log("📊 Footer count:", footer.length);
+      
+      if (!employeesData || employeesData.length === 0) {
+        alert("No data found in the EM Sheet!");
+        setIsUpdating(false);
+        return;
+      }
+
+      // Filter out header row
+      const filteredData = employeesData.filter(emp => 
+        emp.doerName && 
+        emp.doerName !== "DOER NAME" && 
+        emp.doerName !== "DOER NAME " &&
+        !emp.doerName.includes("WEEK NO.")
+      );
+
+      if (filteredData.length === 0) {
+        alert("No valid employee data found!");
+        setIsUpdating(false);
+        return;
+      }
+
+      const totalRows = filteredData.length;
+      console.log(`📊 Total rows: ${totalRows}`);
+
+      // Create PDF
+      const doc = new jsPDF("landscape", "mm", "a4");
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      // Title function - uses weekInfo from sheet
+      const addTitle = (docInstance) => {
+        docInstance.setFillColor(255, 235, 156);
+        docInstance.rect(10, 8, pageWidth - 20, 9, "F");
+        docInstance.setFontSize(12);
+        docInstance.setTextColor(0, 0, 0);
+        docInstance.setFont("helvetica", "bold");
+        // ⭐ Use weekInfo from sheet directly
+        const titleText = weekInfo || `WEEK NO.-${selectedWeek} ( ${weekRange.start} TO ${weekRange.end} )`;
+        docInstance.text(titleText, pageWidth / 2, 14.5, { align: "center" });
+      };
+
+      // Headers - EXACT as per sheet
+      const headers = [
+        [
+          { content: "NO", rowSpan: 2 },
+          { content: "DOER NAME", rowSpan: 2 },
+          { content: "WITH OUT DELIGATION", colSpan: 4 },
+          { content: "ONLY DELEGATION", colSpan: 5 },
+          { content: "EM DOER", rowSpan: 2 }
+        ],
+        [
+          "TOTAL NO.OF TASK",
+          "PENDING TASK",
+          "%",
+          "EM REPETITION COUNTS",
+          "TOTAL NO.OF TASK",
+          "PENDING TASK",
+          "%",
+          "EM REPETITION COUNTS",
+          "NEXT TARGET",
+          ""
+        ]
+      ];
+
+      // Bigger font size
+      const fontSize = 6.5;
+
+      // Page 1: First 30 rows
+      const page1Data = filteredData.slice(0, 30);
+      const page2Data = filteredData.slice(30);
+
+      // ==================== PAGE 1 ====================
+      addTitle(doc);
+
+      const bodyData1 = page1Data.map((emp, index) => [
+        index + 1,
+        emp.doerName || "",
+        emp.withoutDelegation?.totalTask || 0,
+        emp.withoutDelegation?.pendingTask || 0,
+        emp.withoutDelegation?.percent || "0%",
+        emp.withoutDelegation?.emRepetition || "",
+        emp.delegation?.totalTask || 0,
+        emp.delegation?.pendingTask || 0,
+        emp.delegation?.percent || "0%",
+        emp.delegation?.emRepetition || "",
+        emp.delegation?.nextTarget || "",
+        emp.emDoer || "NO"
+      ]);
+
+      autoTable(doc, {
+        head: headers,
+        body: bodyData1,
+        startY: 22,
+        theme: 'grid',
+        styles: {
+          fontSize: fontSize,
+          halign: 'center',
+          valign: 'middle',
+          lineColor: [0, 0, 0],
+          lineWidth: 0.1,
+          cellPadding: 0.6,
+          minCellHeight: 4.2,
+        },
+        headStyles: {
+          fillColor: [0, 102, 204],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: fontSize + 0.5,
+          halign: 'center',
+          valign: 'middle',
+        },
+        columnStyles: {
+          0: { cellWidth: 7 },
+          1: { cellWidth: 27 },
+          2: { cellWidth: 13 },
+          3: { cellWidth: 13 },
+          4: { cellWidth: 14 },
+          5: { cellWidth: 18 },
+          6: { cellWidth: 13 },
+          7: { cellWidth: 13 },
+          8: { cellWidth: 14 },
+          9: { cellWidth: 18 },
+          10: { cellWidth: 16 },
+          11: { cellWidth: 9 },
+        },
+        tableWidth: 'auto',
+        margin: { left: 6, right: 6 },
+        pageBreak: 'avoid',
+      });
+
+      // ==================== PAGE 2 ====================
+      doc.addPage();
+      addTitle(doc);
+
+      const bodyData2 = page2Data.map((emp, index) => [
+        30 + index + 1,
+        emp.doerName || "",
+        emp.withoutDelegation?.totalTask || 0,
+        emp.withoutDelegation?.pendingTask || 0,
+        emp.withoutDelegation?.percent || "0%",
+        emp.withoutDelegation?.emRepetition || "",
+        emp.delegation?.totalTask || 0,
+        emp.delegation?.pendingTask || 0,
+        emp.delegation?.percent || "0%",
+        emp.delegation?.emRepetition || "",
+        emp.delegation?.nextTarget || "",
+        emp.emDoer || "NO"
+      ]);
+
+      autoTable(doc, {
+        head: headers,
+        body: bodyData2,
+        startY: 22,
+        theme: 'grid',
+        styles: {
+          fontSize: fontSize,
+          halign: 'center',
+          valign: 'middle',
+          lineColor: [0, 0, 0],
+          lineWidth: 0.1,
+          cellPadding: 0.6,
+          minCellHeight: 4.2,
+        },
+        headStyles: {
+          fillColor: [0, 102, 204],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: fontSize + 0.5,
+          halign: 'center',
+          valign: 'middle',
+        },
+        columnStyles: {
+          0: { cellWidth: 7 },
+          1: { cellWidth: 27 },
+          2: { cellWidth: 13 },
+          3: { cellWidth: 13 },
+          4: { cellWidth: 14 },
+          5: { cellWidth: 18 },
+          6: { cellWidth: 13 },
+          7: { cellWidth: 13 },
+          8: { cellWidth: 14 },
+          9: { cellWidth: 18 },
+          10: { cellWidth: 16 },
+          11: { cellWidth: 9 },
+        },
+        tableWidth: 'auto',
+        margin: { left: 6, right: 6 },
+        pageBreak: 'avoid',
+      });
+
+      // ==================== FOOTER ON PAGE 2 ====================
+      if (footer && footer.length > 0) {
+        const footerStartY = pageHeight - 28;
+        const footerData = footer.map(f => [f.label + " " + (f.value || ""), f.value || ""]);
+        
+        autoTable(doc, {
+          body: footerData,
+          startY: footerStartY,
+          theme: 'grid',
+          styles: {
+            fontSize: 6,
+            halign: 'center',
+            valign: 'middle',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1,
+            cellPadding: 1,
+          },
+          headStyles: {
+            fillColor: [198, 224, 180],
+            textColor: [0, 0, 0],
+            fontStyle: 'bold',
+            fontSize: 6,
+          },
+          columnStyles: {
+            0: { cellWidth: 85 },
+            1: { cellWidth: 40 },
+          },
+          tableWidth: 125,
+          margin: { left: pageWidth - 135 },
+          pageBreak: 'avoid',
+        });
+      }
+
+      doc.save(`EM_SHEET_${selectedWeek}.pdf`);
+      setIsUpdating(false);
+      
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Error generating PDF: " + (error.response?.data?.error || error.message));
+      setIsUpdating(false);
+    }
+  }, [selectedWeek, weekRange, token]);
+
+  // ================= WHATSAPP & PDF =================
   const sendBulkWhatsApp = useCallback(async () => {
     if (allDashboardData.length === 0) return alert("No data to send!");
     if (!window.confirm(`Send WhatsApp report to ${allDashboardData.length} employees?`)) return;
@@ -161,9 +432,9 @@ export default function Dashboard() {
       const cleanPhone = phone.toString().replace(/\D/g, "");
       const finalPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
       const withoutDelData = calculateWithoutDelegation(emp);
-      const woOverall = withoutDelData.overallScore.replace("-", "");
-      const delOverall = calculateDelegationOverall(emp.delegation).replace("-", "");
-      const isHighScorer = parseFloat(woOverall) > 10 || parseFloat(delOverall) > 10;
+      const woOverall = Math.abs(withoutDelData.overallScore || 0);
+      const delOverall = Math.abs(calculateDelegationOverall(emp.delegation) || 0);
+      const isHighScorer = woOverall > 10 || delOverall > 10;
       const var5 = isMonday ? (isHighScorer ? "⚠️ EM MEETING ALERT: Score > 10%" : "🌟 EXCELLENT") : "🚀 PERFORMANCE REMINDER";
       const var6 = isMonday ? (isHighScorer ? "Prepared with reasons." : "Proud of you!") : "Maintain your score.";
 
@@ -178,8 +449,8 @@ export default function Dashboard() {
             components: [{ type: "body", parameters: [
               { type: "text", text: String(emp.name) },
               { type: "text", text: `${weekRange.start} to ${weekRange.end}` },
-              { type: "text", text: String(delOverall) },
-              { type: "text", text: String(woOverall) },
+              { type: "text", text: String(Math.round(delOverall * 100) / 100) },
+              { type: "text", text: String(Math.round(woOverall * 100) / 100) },
               { type: "text", text: String(var5) },
               { type: "text", text: String(var6) }
             ]}]
@@ -211,18 +482,17 @@ export default function Dashboard() {
 
     const body = allDashboardData.map((emp, idx) => {
       const withoutDelData = calculateWithoutDelegation(emp);
-      const delOverall = calculateDelegationOverall(emp.delegation);
+      const delOverall = Math.abs(calculateDelegationOverall(emp.delegation) || 0);
       const overall = emp.overall || {};
-      const woOverallNum = parseFloat(withoutDelData.overallScore.replace("-", "") || 0);
-      const delOverallNum = parseFloat(delOverall.replace("-", "") || 0);
-      const isEMDoer = (woOverallNum > 10 || delOverallNum > 10) ? "YES" : "NO";
+      const woOverallNum = Math.abs(withoutDelData.overallScore || 0);
+      const isEMDoer = (woOverallNum > 10 || delOverall > 10) ? "YES" : "NO";
       const del = emp.delegation || {};
       return [
         idx + 1, emp.name,
         withoutDelData.totalWork, withoutDelData.completedWork, withoutDelData.onTimeWork, withoutDelData.pendingWork,
-        withoutDelData.pendingPercent + "%", withoutDelData.delayPercent + "%", withoutDelData.overallScore,
+        formatPercent(withoutDelData.pendingPercent), formatPercent(withoutDelData.delayPercent), formatPercent(withoutDelData.overallScore),
         del.totalWork || 0, del.completedWork || 0, del.onTimeWork || 0, del.pendingWork || 0,
-        formatPercent(del.pendingPercent), formatPercent(del.delayPercent), delOverall,
+        formatPercent(del.pendingPercent), formatPercent(del.delayPercent), formatPercent(delOverall),
         overall.totalWork || 0, overall.totalCompleted || 0, overall.totalOnTime || 0, overall.totalPending || 0,
         formatPercent(overall.pendingPercent), formatPercent(overall.delayPercent), formatPercent(overall.overallScore),
         isEMDoer
@@ -242,12 +512,11 @@ export default function Dashboard() {
   const employeeDataRendered = useMemo(() => {
     return allDashboardData.map((emp, idx) => {
       const withoutDelData = calculateWithoutDelegation(emp);
-      const delOverall = calculateDelegationOverall(emp.delegation);
+      const delOverall = Math.abs(calculateDelegationOverall(emp.delegation) || 0);
       const overallData = emp.overall || {};
-      const woOverallNum = parseFloat(withoutDelData.overallScore.replace("-", "") || 0);
-      const delOverallNum = parseFloat(delOverall.replace("-", "") || 0);
-      const combinedOverall = ((woOverallNum + delOverallNum) / 2).toFixed(2);
-      return { emp, idx, withoutDelData, delOverall, overallData, combinedOverall, woOverallNum, delOverallNum };
+      const woOverallNum = Math.abs(withoutDelData.overallScore || 0);
+      const combinedOverall = ((woOverallNum + delOverall) / 2);
+      return { emp, idx, withoutDelData, delOverall, overallData, combinedOverall, woOverallNum };
     });
   }, [allDashboardData, calculateWithoutDelegation, calculateDelegationOverall]);
 
@@ -274,10 +543,22 @@ export default function Dashboard() {
               </select>
             </div>
             {selectedEmployee === "all" && (
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <button onClick={() => downloadPDF("all")} disabled={loading} className={`flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg transition-all active:scale-95 ${loading ? 'bg-slate-600' : 'bg-blue-600 hover:bg-blue-700'}`}>ALL REPORT</button>
                 <button onClick={() => downloadPDF("em")} disabled={loading} className={`flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg transition-all active:scale-95 ${loading ? 'bg-slate-600' : 'bg-rose-600 hover:bg-rose-700'}`}>EM REPORT</button>
                 <button onClick={sendBulkWhatsApp} disabled={true} className="flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg bg-slate-600">WHATSAPP</button>
+                
+                {isEminentAdmin && (
+                  <button 
+                    onClick={downloadEMSheet} 
+                    disabled={loading || isUpdating} 
+                    className={`flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg transition-all active:scale-95 ${
+                      loading || isUpdating ? 'bg-slate-600' : 'bg-emerald-600 hover:bg-emerald-700 animate-pulse'
+                    }`}
+                  >
+                    {isUpdating ? '⏳ Loading...' : '📊 EM SHEET Ritesh Sir'}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -289,9 +570,9 @@ export default function Dashboard() {
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100/80 backdrop-blur-sm z-50">
             <div className="relative">
               <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-600 font-bold text-[10px]">{isUpdating ? "WA" : "DATA"}</div>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-600 font-bold text-[10px]">{isUpdating ? "PDF" : "DATA"}</div>
             </div>
-            <p className="mt-4 text-slate-600 font-black text-xs animate-pulse uppercase tracking-widest">{isUpdating ? "Sending..." : "Fetching Dashboard..."}</p>
+            <p className="mt-4 text-slate-600 font-black text-xs animate-pulse uppercase tracking-widest">{isUpdating ? "Generating PDF..." : "Fetching Dashboard..."}</p>
           </div>
         )}
 
@@ -306,13 +587,13 @@ export default function Dashboard() {
                         <h2 className="font-black uppercase text-lg text-slate-700 group-hover:text-blue-700">{emp.name}</h2>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-100 text-blue-700">Employee #{idx + 1}</span>
-                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${parseFloat(combinedOverall) > 10 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{parseFloat(combinedOverall) > 10 ? '⚠️ EM Required' : '✅ Good'}</span>
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${combinedOverall > 10 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{combinedOverall > 10 ? '⚠️ EM Required' : '✅ Good'}</span>
                         </div>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 cursor-default">
-                      <SectionBlock title="Delegation" data={emp.delegation} score={delOverall} formatPercent={formatPercent} theme="slate" />
-                      <SectionBlock title="Without Delegation" data={withoutDelData} formatPercent={formatPercent} theme="blue" score={withoutDelData.overallScore} />
+                      <SectionBlock title="Delegation" data={emp.delegation} score={formatPercent(delOverall)} formatPercent={formatPercent} theme="slate" />
+                      <SectionBlock title="Without Delegation" data={withoutDelData} formatPercent={formatPercent} theme="blue" score={formatPercent(withoutDelData.overallScore)} />
                       <SectionBlock title="Overall" data={overallData} formatPercent={formatPercent} theme="emerald" score={formatPercent(overallData.overallScore)} />
                     </div>
                   </div>
@@ -374,4 +655,4 @@ const SectionBlock = React.memo(({ title, data, score, formatPercent, theme }) =
       )}
     </div>
   );
-}); 
+});
