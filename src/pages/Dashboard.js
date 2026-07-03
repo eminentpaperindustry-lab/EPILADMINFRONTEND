@@ -61,12 +61,360 @@ const SingleSection = React.memo(({ title, data, showScore = false, formatPercen
 });
 
 // ============================================================
+// EM SHEET MODAL COMPONENT - WITH PERCENTAGE BASED TOGGLES (FIXED)
+// ============================================================
+const EMSheetModal = React.memo(({ 
+  isOpen, 
+  onClose, 
+  data, 
+  weekInfo, 
+  footer, 
+  onDownloadEM, 
+  onDownloadAll,
+  loading 
+}) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [withoutDelToggle, setWithoutDelToggle] = useState(false);
+  const [delegationToggle, setDelegationToggle] = useState(false);
+  const [activeSort, setActiveSort] = useState('without');
+  const rowsPerPage = 30;
+
+  const validData = useMemo(() => {
+    if (!isOpen) return [];
+    if (!data || !Array.isArray(data)) return [];
+    return data.filter(emp => 
+      emp.doerName && 
+      emp.doerName !== "DOER NAME" && 
+      emp.doerName !== "DOER NAME " &&
+      !emp.doerName.includes("WEEK NO.")
+    );
+  }, [data, isOpen]);
+
+  const extractPercentage = (percentStr) => {
+    if (!percentStr) return 0;
+    if (typeof percentStr === 'number') return percentStr;
+    if (typeof percentStr === 'string') {
+      const num = parseFloat(percentStr.replace('%', ''));
+      return isNaN(num) ? 0 : num;
+    }
+    return 0;
+  };
+
+  const sortedWithoutDelData = useMemo(() => {
+    if (!isOpen) return [];
+    return [...validData].sort((a, b) => {
+      const aPercent = extractPercentage(a.withoutDelegation?.percent);
+      const bPercent = extractPercentage(b.withoutDelegation?.percent);
+      return withoutDelToggle ? bPercent - aPercent : aPercent - bPercent;
+    });
+  }, [validData, withoutDelToggle, isOpen]);
+
+  const sortedDelegationData = useMemo(() => {
+    if (!isOpen) return [];
+    return [...validData].sort((a, b) => {
+      const aPercent = extractPercentage(a.delegation?.percent);
+      const bPercent = extractPercentage(b.delegation?.percent);
+      return delegationToggle ? bPercent - aPercent : aPercent - bPercent;
+    });
+  }, [validData, delegationToggle, isOpen]);
+
+  const displayData = useMemo(() => {
+    if (activeSort === 'without') {
+      return sortedWithoutDelData;
+    }
+    if (activeSort === 'delegation') {
+      return sortedDelegationData;
+    }
+    return sortedWithoutDelData;
+  }, [sortedWithoutDelData, sortedDelegationData, activeSort]);
+
+  const emDoers = useMemo(() => {
+    if (!isOpen) return [];
+    return validData.filter(emp => emp.emDoer === "YES");
+  }, [validData, isOpen]);
+
+  const totalPages = useMemo(() => {
+    if (!isOpen) return 1;
+    return Math.ceil(displayData.length / rowsPerPage);
+  }, [displayData, isOpen]);
+
+  const paginatedData = useMemo(() => {
+    if (!isOpen) return [];
+    const start = (currentPage - 1) * rowsPerPage;
+    const end = start + rowsPerPage;
+    return displayData.slice(start, end);
+  }, [displayData, currentPage, isOpen]);
+
+  if (!isOpen) return null;
+
+  const toggleWithoutDelegation = () => {
+    const newState = !withoutDelToggle;
+    setWithoutDelToggle(newState);
+    setActiveSort('without');
+    if (newState) {
+      setDelegationToggle(false);
+    }
+    setCurrentPage(1);
+    
+    const tableElement = document.getElementById('em-sheet-table');
+    if (tableElement) {
+      tableElement.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const toggleDelegation = () => {
+    const newState = !delegationToggle;
+    setDelegationToggle(newState);
+    setActiveSort('delegation');
+    if (newState) {
+      setWithoutDelToggle(false);
+    }
+    setCurrentPage(1);
+    
+    const tableElement = document.getElementById('em-sheet-table');
+    if (tableElement) {
+      tableElement.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const resetSort = () => {
+    setWithoutDelToggle(false);
+    setDelegationToggle(false);
+    setActiveSort('without');
+    setCurrentPage(1);
+    const tableElement = document.getElementById('em-sheet-table');
+    if (tableElement) {
+      tableElement.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const getSortInfo = () => {
+    if (activeSort === 'without' && withoutDelToggle) return '⬇️ Without Del - High to Low %';
+    if (activeSort === 'without' && !withoutDelToggle) return '⬆️ Without Del - Low to High %';
+    if (activeSort === 'delegation' && delegationToggle) return '⬇️ Delegation - High to Low %';
+    if (activeSort === 'delegation' && !delegationToggle) return '⬆️ Delegation - Low to High %';
+    return '⬆️ Without Del - Low to High %';
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col animate-fadeIn">
+        <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-blue-600 text-white p-4 rounded-t-2xl flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-black uppercase tracking-wider">📊 EM Sheet</h2>
+            <p className="text-xs text-blue-200 font-bold">{weekInfo || "Loading..."}</p>
+          </div>
+          <button 
+            onClick={onClose}
+            className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-4 p-4 bg-slate-50 border-b">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-600">Total Employees:</span>
+            <span className="text-sm font-black text-indigo-600">{validData.length}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-600">EM Doers:</span>
+            <span className="text-sm font-black text-rose-600">{emDoers.length}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-600">Page:</span>
+            <span className="text-sm font-black text-blue-600">{currentPage} / {totalPages || 1}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-600">Sorting:</span>
+            <span className="text-sm font-black text-indigo-600">
+              {getSortInfo()}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3 p-4 bg-white border-b">
+          <button 
+            onClick={toggleWithoutDelegation}
+            className={`px-4 py-2 text-white text-xs font-black rounded-lg transition-all active:scale-95 flex items-center gap-2 ${
+              activeSort === 'without' && withoutDelToggle ? 'bg-blue-600 hover:bg-blue-700' : 
+              activeSort === 'without' && !withoutDelToggle ? 'bg-indigo-600 hover:bg-indigo-700' :
+              'bg-slate-500 hover:bg-slate-600'
+            }`}
+          >
+            {activeSort === 'without' && withoutDelToggle ? '⬇️ Without Del - High to Low %' : 
+             activeSort === 'without' && !withoutDelToggle ? '⬆️ Without Del - Low to High %' :
+             '📊 Without Del'}
+          </button>
+
+          <button 
+            onClick={toggleDelegation}
+            className={`px-4 py-2 text-white text-xs font-black rounded-lg transition-all active:scale-95 flex items-center gap-2 ${
+              activeSort === 'delegation' && delegationToggle ? 'bg-blue-600 hover:bg-blue-700' : 
+              activeSort === 'delegation' && !delegationToggle ? 'bg-indigo-600 hover:bg-indigo-700' :
+              'bg-slate-500 hover:bg-slate-600'
+            }`}
+          >
+            {activeSort === 'delegation' && delegationToggle ? '⬇️ Delegation - High to Low %' : 
+             activeSort === 'delegation' && !delegationToggle ? '⬆️ Delegation - Low to High %' :
+             '📊 Delegation'}
+          </button>
+
+          <button 
+            onClick={resetSort}
+            className="px-4 py-2 bg-slate-600 text-white text-xs font-black rounded-lg hover:bg-slate-700 transition-all active:scale-95 flex items-center gap-2"
+          >
+            🔄 Reset Sort
+          </button>
+
+          <button 
+            onClick={onDownloadEM}
+            disabled={loading}
+            className={`px-4 py-2 text-white text-xs font-black rounded-lg transition-all active:scale-95 flex items-center gap-2 ${
+              loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700'
+            }`}
+          >
+            📥 Download EM Only
+          </button>
+          <button 
+            onClick={onDownloadAll}
+            disabled={loading}
+            className={`px-4 py-2 text-white text-xs font-black rounded-lg transition-all active:scale-95 flex items-center gap-2 ${
+              loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'
+            }`}
+          >
+            📥 Download All
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto p-4" id="em-sheet-table">
+          {validData.length === 0 ? (
+            <div className="text-center py-10">
+              <p className="text-slate-400 font-bold">No data available</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-blue-700 text-white">
+                      <th rowSpan="2" className="border border-black/20 p-1.5 text-center font-bold" style={{minWidth: '35px'}}>NO</th>
+                      <th rowSpan="2" className="border border-black/20 p-1.5 text-center font-bold" style={{minWidth: '100px'}}>DOER NAME</th>
+                      <th colSpan="4" className="border border-black/20 p-1.5 text-center font-bold">WITHOUT DELEGATION</th>
+                      <th colSpan="5" className="border border-black/20 p-1.5 text-center font-bold">DELEGATION</th>
+                      <th rowSpan="2" className="border border-black/20 p-1.5 text-center font-bold" style={{minWidth: '60px'}}>EM DOER</th>
+                    </tr>
+                    <tr className="bg-blue-600 text-white">
+                      <th className="border border-black/20 p-1.5 text-center">TOTAL</th>
+                      <th className="border border-black/20 p-1.5 text-center">PENDING</th>
+                      <th className="border border-black/20 p-1.5 text-center">%</th>
+                      <th className="border border-black/20 p-1.5 text-center">EM REP.</th>
+                      <th className="border border-black/20 p-1.5 text-center">TOTAL</th>
+                      <th className="border border-black/20 p-1.5 text-center">PENDING</th>
+                      <th className="border border-black/20 p-1.5 text-center">%</th>
+                      <th className="border border-black/20 p-1.5 text-center">EM REP.</th>
+                      <th className="border border-black/20 p-1.5 text-center">NEXT TARGET</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedData.map((emp, idx) => {
+                      const rowNum = (currentPage - 1) * rowsPerPage + idx + 1;
+                      const isEMDoer = emp.emDoer === "YES";
+                      const withoutDelegation = emp.withoutDelegation || {};
+                      const delegation = emp.delegation || {};
+                      
+                      return (
+                        <tr key={idx} className={`${isEMDoer ? 'bg-rose-50' : 'hover:bg-blue-50'} transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                          <td className="border border-black/20 p-1.5 text-center font-bold">{rowNum}</td>
+                          <td className="border border-black/20 p-1.5 text-left font-medium">{emp.doerName || ""}</td>
+                          <td className="border border-black/20 p-1.5 text-center">{withoutDelegation.totalTask || 0}</td>
+                          <td className="border border-black/20 p-1.5 text-center">{withoutDelegation.pendingTask || 0}</td>
+                          <td className="border border-black/20 p-1.5 text-center font-bold text-blue-600">{withoutDelegation.percent || "0%"}</td>
+                          <td className="border border-black/20 p-1.5 text-center">{withoutDelegation.emRepetition || ""}</td>
+                          <td className="border border-black/20 p-1.5 text-center">{delegation.totalTask || 0}</td>
+                          <td className="border border-black/20 p-1.5 text-center">{delegation.pendingTask || 0}</td>
+                          <td className="border border-black/20 p-1.5 text-center font-bold text-indigo-600">{delegation.percent || "0%"}</td>
+                          <td className="border border-black/20 p-1.5 text-center">{delegation.emRepetition || ""}</td>
+                          <td className="border border-black/20 p-1.5 text-center">{delegation.nextTarget || ""}</td>
+                          <td className={`border border-black/20 p-1.5 text-center font-bold ${isEMDoer ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            {emp.emDoer || "NO"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-4">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 bg-slate-200 text-slate-700 text-xs font-bold rounded disabled:opacity-50 hover:bg-slate-300 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs font-bold text-slate-600">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 bg-slate-200 text-slate-700 text-xs font-bold rounded disabled:opacity-50 hover:bg-slate-300 transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {footer && footer.length > 0 && (
+            <div className="mt-6 border-t pt-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {footer.map((item, idx) => {
+                  let label = "";
+                  let value = "";
+                  if (typeof item === 'string') {
+                    label = item;
+                  } else if (typeof item === 'object') {
+                    label = item.label || "";
+                    value = item.value || "";
+                  }
+                  return (
+                    <div key={idx} className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-500">{label}</span>
+                      <span className="text-xs font-black text-slate-700 ml-2">{value}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 bg-slate-50 p-4 rounded-b-2xl border-t flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-slate-600 text-white text-sm font-bold rounded-lg hover:bg-slate-700 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ============================================================
 // MAIN DASHBOARD COMPONENT
 // ============================================================
 export default function Dashboard() {
   const { user, token } = useContext(AuthContext);
 
-  // Check if user is Eminent admin
   const isEminentAdmin = useMemo(() => {
     const company = user?.company || user?.companyName || "";
     return company === "Eminent";
@@ -80,8 +428,10 @@ export default function Dashboard() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [weekRange, setWeekRange] = useState({ start: "", end: "" });
   const [allDashboardData, setAllDashboardData] = useState([]);
+  const [emSheetModalOpen, setEmSheetModalOpen] = useState(false);
+  const [emSheetData, setEmSheetData] = useState({ employees: [], weekInfo: "", footer: [] });
+  const [emSheetLoading, setEmSheetLoading] = useState(false);
 
-  // ================= LOAD EMPLOYEES =================
   const loadEmployees = useCallback(async () => {
     try {
       const res = await axios.get("/employee/all", {
@@ -93,7 +443,6 @@ export default function Dashboard() {
     }
   }, [token]);
 
-  // ================= LOAD DASHBOARD =================
   const loadAllDashboard = useCallback(async () => {
     try {
       setLoading(true);
@@ -114,11 +463,34 @@ export default function Dashboard() {
     }
   }, [token, selectedEmployee, selectedMonth, selectedWeek]);
 
-  // ================= EFFECTS =================
+  const loadEMSheetData = useCallback(async () => {
+    try {
+      setEmSheetLoading(true);
+      const response = await axios.get("/em-sheet/em-sheet", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.data.success) {
+        setEmSheetData({
+          employees: response.data.data?.employees || [],
+          weekInfo: response.data.data?.weekInfo || "",
+          footer: response.data.data?.footer || []
+        });
+        setEmSheetModalOpen(true);
+      } else {
+        alert("Failed to fetch EM Sheet data: " + (response.data.error || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Error loading EM Sheet:", error);
+      alert("Error loading EM Sheet: " + (error.response?.data?.error || error.message));
+    } finally {
+      setEmSheetLoading(false);
+    }
+  }, [token]);
+
   useEffect(() => { loadEmployees(); }, [loadEmployees]);
   useEffect(() => { loadAllDashboard(); }, [loadAllDashboard]);
 
-  // ================= SAFE FORMAT HELPERS =================
   const formatPercent = useCallback((value) => {
     if (!value && value !== 0) return "0.00%";
     const num = parseFloat(value);
@@ -156,8 +528,7 @@ export default function Dashboard() {
     return overall > 0 ? -overall : 0;
   }, []);
 
-  // ================= EM SHEET PDF DOWNLOAD - FINAL =================
-  const downloadEMSheet = useCallback(async () => {
+  const downloadEMSheetPDF = useCallback(async (filterType = "all") => {
     try {
       setIsUpdating(true);
       
@@ -165,222 +536,161 @@ export default function Dashboard() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      console.log("📊 Full Response:", response.data);
-
       if (!response.data.success) {
         alert("Failed to fetch EM Sheet data: " + (response.data.error || "Unknown error"));
         setIsUpdating(false);
         return;
       }
 
-      const employeesData = response.data.data?.employees || [];
+      let employeesData = response.data.data?.employees || [];
       const weekInfo = response.data.data?.weekInfo || "";
       const footer = response.data.data?.footer || [];
       
-      console.log("📊 Week Info from sheet:", weekInfo);
-      console.log("📊 Employees count:", employeesData.length);
-      console.log("📊 Footer count:", footer.length);
-      
-      if (!employeesData || employeesData.length === 0) {
-        alert("No data found in the EM Sheet!");
-        setIsUpdating(false);
-        return;
-      }
-
-      // Filter out header row
-      const filteredData = employeesData.filter(emp => 
+      let filteredData = employeesData.filter(emp => 
         emp.doerName && 
         emp.doerName !== "DOER NAME" && 
         emp.doerName !== "DOER NAME " &&
         !emp.doerName.includes("WEEK NO.")
       );
 
+      if (filterType === "em") {
+        filteredData = filteredData.filter(emp => emp.emDoer === "YES");
+      }
+
       if (filteredData.length === 0) {
-        alert("No valid employee data found!");
+        alert("No data found to download!");
         setIsUpdating(false);
         return;
       }
 
-      const totalRows = filteredData.length;
-      console.log(`📊 Total rows: ${totalRows}`);
-
-      // Create PDF
       const doc = new jsPDF("landscape", "mm", "a4");
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
 
-      // Title function - uses weekInfo from sheet
       const addTitle = (docInstance) => {
         docInstance.setFillColor(255, 235, 156);
         docInstance.rect(10, 8, pageWidth - 20, 9, "F");
         docInstance.setFontSize(12);
         docInstance.setTextColor(0, 0, 0);
         docInstance.setFont("helvetica", "bold");
-        // ⭐ Use weekInfo from sheet directly
         const titleText = weekInfo || `WEEK NO.-${selectedWeek} ( ${weekRange.start} TO ${weekRange.end} )`;
         docInstance.text(titleText, pageWidth / 2, 14.5, { align: "center" });
       };
 
-      // Headers - EXACT as per sheet
       const headers = [
         [
           { content: "NO", rowSpan: 2 },
           { content: "DOER NAME", rowSpan: 2 },
-          { content: "WITH OUT DELIGATION", colSpan: 4 },
-          { content: "ONLY DELEGATION", colSpan: 5 },
+          { content: "WITHOUT DELEGATION", colSpan: 4 },
+          { content: "DELEGATION", colSpan: 5 },
           { content: "EM DOER", rowSpan: 2 }
         ],
         [
-          "TOTAL NO.OF TASK",
-          "PENDING TASK",
+          "TOTAL",
+          "PENDING",
           "%",
-          "EM REPETITION COUNTS",
-          "TOTAL NO.OF TASK",
-          "PENDING TASK",
+          "EM REP.",
+          "TOTAL",
+          "PENDING",
           "%",
-          "EM REPETITION COUNTS",
+          "EM REP.",
           "NEXT TARGET",
           ""
         ]
       ];
 
-      // Bigger font size
-      const fontSize = 6.5;
+      const fontSize = 6;
+      const pageSize = 30;
+      const pages = [];
+      for (let i = 0; i < filteredData.length; i += pageSize) {
+        pages.push(filteredData.slice(i, i + pageSize));
+      }
 
-      // Page 1: First 30 rows
-      const page1Data = filteredData.slice(0, 30);
-      const page2Data = filteredData.slice(30);
+      pages.forEach((pageData, pageIndex) => {
+        if (pageIndex > 0) {
+          doc.addPage();
+        }
+        addTitle(doc);
 
-      // ==================== PAGE 1 ====================
-      addTitle(doc);
+        const bodyData = pageData.map((emp, index) => {
+          const startIndex = pageIndex * pageSize;
+          const rowNum = startIndex + index + 1;
+          const withoutDelegation = emp.withoutDelegation || {};
+          const delegation = emp.delegation || {};
+          
+          return [
+            rowNum,
+            emp.doerName || "",
+            withoutDelegation.totalTask || 0,
+            withoutDelegation.pendingTask || 0,
+            withoutDelegation.percent || "0%",
+            withoutDelegation.emRepetition || "",
+            delegation.totalTask || 0,
+            delegation.pendingTask || 0,
+            delegation.percent || "0%",
+            delegation.emRepetition || "",
+            delegation.nextTarget || "",
+            emp.emDoer || "NO"
+          ];
+        });
 
-      const bodyData1 = page1Data.map((emp, index) => [
-        index + 1,
-        emp.doerName || "",
-        emp.withoutDelegation?.totalTask || 0,
-        emp.withoutDelegation?.pendingTask || 0,
-        emp.withoutDelegation?.percent || "0%",
-        emp.withoutDelegation?.emRepetition || "",
-        emp.delegation?.totalTask || 0,
-        emp.delegation?.pendingTask || 0,
-        emp.delegation?.percent || "0%",
-        emp.delegation?.emRepetition || "",
-        emp.delegation?.nextTarget || "",
-        emp.emDoer || "NO"
-      ]);
-
-      autoTable(doc, {
-        head: headers,
-        body: bodyData1,
-        startY: 22,
-        theme: 'grid',
-        styles: {
-          fontSize: fontSize,
-          halign: 'center',
-          valign: 'middle',
-          lineColor: [0, 0, 0],
-          lineWidth: 0.1,
-          cellPadding: 0.6,
-          minCellHeight: 4.2,
-        },
-        headStyles: {
-          fillColor: [0, 102, 204],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          fontSize: fontSize + 0.5,
-          halign: 'center',
-          valign: 'middle',
-        },
-        columnStyles: {
-          0: { cellWidth: 7 },
-          1: { cellWidth: 27 },
-          2: { cellWidth: 13 },
-          3: { cellWidth: 13 },
-          4: { cellWidth: 14 },
-          5: { cellWidth: 18 },
-          6: { cellWidth: 13 },
-          7: { cellWidth: 13 },
-          8: { cellWidth: 14 },
-          9: { cellWidth: 18 },
-          10: { cellWidth: 16 },
-          11: { cellWidth: 9 },
-        },
-        tableWidth: 'auto',
-        margin: { left: 6, right: 6 },
-        pageBreak: 'avoid',
+        autoTable(doc, {
+          head: headers,
+          body: bodyData,
+          startY: 22,
+          theme: 'grid',
+          styles: {
+            fontSize: fontSize,
+            halign: 'center',
+            valign: 'middle',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1,
+            cellPadding: 0.8,
+            minCellHeight: 4.5,
+          },
+          headStyles: {
+            fillColor: [0, 102, 204],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: fontSize + 0.5,
+            halign: 'center',
+            valign: 'middle',
+          },
+          columnStyles: {
+            0: { cellWidth: 8 },
+            1: { cellWidth: 28 },
+            2: { cellWidth: 14 },
+            3: { cellWidth: 14 },
+            4: { cellWidth: 14 },
+            5: { cellWidth: 18 },
+            6: { cellWidth: 14 },
+            7: { cellWidth: 14 },
+            8: { cellWidth: 14 },
+            9: { cellWidth: 18 },
+            10: { cellWidth: 16 },
+            11: { cellWidth: 10 },
+          },
+          tableWidth: 'auto',
+          margin: { left: 6, right: 6 },
+          pageBreak: 'avoid',
+        });
       });
 
-      // ==================== PAGE 2 ====================
-      doc.addPage();
-      addTitle(doc);
-
-      const bodyData2 = page2Data.map((emp, index) => [
-        30 + index + 1,
-        emp.doerName || "",
-        emp.withoutDelegation?.totalTask || 0,
-        emp.withoutDelegation?.pendingTask || 0,
-        emp.withoutDelegation?.percent || "0%",
-        emp.withoutDelegation?.emRepetition || "",
-        emp.delegation?.totalTask || 0,
-        emp.delegation?.pendingTask || 0,
-        emp.delegation?.percent || "0%",
-        emp.delegation?.emRepetition || "",
-        emp.delegation?.nextTarget || "",
-        emp.emDoer || "NO"
-      ]);
-
-      autoTable(doc, {
-        head: headers,
-        body: bodyData2,
-        startY: 22,
-        theme: 'grid',
-        styles: {
-          fontSize: fontSize,
-          halign: 'center',
-          valign: 'middle',
-          lineColor: [0, 0, 0],
-          lineWidth: 0.1,
-          cellPadding: 0.6,
-          minCellHeight: 4.2,
-        },
-        headStyles: {
-          fillColor: [0, 102, 204],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          fontSize: fontSize + 0.5,
-          halign: 'center',
-          valign: 'middle',
-        },
-        columnStyles: {
-          0: { cellWidth: 7 },
-          1: { cellWidth: 27 },
-          2: { cellWidth: 13 },
-          3: { cellWidth: 13 },
-          4: { cellWidth: 14 },
-          5: { cellWidth: 18 },
-          6: { cellWidth: 13 },
-          7: { cellWidth: 13 },
-          8: { cellWidth: 14 },
-          9: { cellWidth: 18 },
-          10: { cellWidth: 16 },
-          11: { cellWidth: 9 },
-        },
-        tableWidth: 'auto',
-        margin: { left: 6, right: 6 },
-        pageBreak: 'avoid',
-      });
-
-      // ==================== FOOTER ON PAGE 2 ====================
       if (footer && footer.length > 0) {
-        const footerStartY = pageHeight - 28;
-        const footerData = footer.map(f => [f.label + " " + (f.value || ""), f.value || ""]);
+        const footerStartY = pageHeight - 25;
+        const footerData = footer.map(f => {
+          if (typeof f === 'object') {
+            return [f.label || "", f.value || ""];
+          }
+          return [f, ""];
+        });
         
         autoTable(doc, {
           body: footerData,
           startY: footerStartY,
           theme: 'grid',
           styles: {
-            fontSize: 6,
+            fontSize: 5.5,
             halign: 'center',
             valign: 'middle',
             lineColor: [0, 0, 0],
@@ -391,7 +701,7 @@ export default function Dashboard() {
             fillColor: [198, 224, 180],
             textColor: [0, 0, 0],
             fontStyle: 'bold',
-            fontSize: 6,
+            fontSize: 5.5,
           },
           columnStyles: {
             0: { cellWidth: 85 },
@@ -403,7 +713,8 @@ export default function Dashboard() {
         });
       }
 
-      doc.save(`EM_SHEET_${selectedWeek}.pdf`);
+      const fileName = filterType === "em" ? `EM_ONLY_${selectedWeek}.pdf` : `EM_SHEET_${selectedWeek}.pdf`;
+      doc.save(fileName);
       setIsUpdating(false);
       
     } catch (error) {
@@ -413,7 +724,6 @@ export default function Dashboard() {
     }
   }, [selectedWeek, weekRange, token]);
 
-  // ================= WHATSAPP & PDF =================
   const sendBulkWhatsApp = useCallback(async () => {
     if (allDashboardData.length === 0) return alert("No data to send!");
     if (!window.confirm(`Send WhatsApp report to ${allDashboardData.length} employees?`)) return;
@@ -508,7 +818,6 @@ export default function Dashboard() {
     doc.save(`${filterType === "em" ? "EM_Report" : "Full_Report"}_W${selectedWeek}.pdf`);
   }, [allDashboardData, selectedWeek, weekRange, calculateWithoutDelegation, calculateDelegationOverall, formatPercent]);
 
-  // ================= MEMOIZED RENDER =================
   const employeeDataRendered = useMemo(() => {
     return allDashboardData.map((emp, idx) => {
       const withoutDelData = calculateWithoutDelegation(emp);
@@ -550,13 +859,13 @@ export default function Dashboard() {
                 
                 {isEminentAdmin && (
                   <button 
-                    onClick={downloadEMSheet} 
-                    disabled={loading || isUpdating} 
+                    onClick={loadEMSheetData}
+                    disabled={loading || emSheetLoading} 
                     className={`flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg transition-all active:scale-95 ${
-                      loading || isUpdating ? 'bg-slate-600' : 'bg-emerald-600 hover:bg-emerald-700 animate-pulse'
+                      loading || emSheetLoading ? 'bg-slate-600' : 'bg-emerald-600 hover:bg-emerald-700 animate-pulse'
                     }`}
                   >
-                    {isUpdating ? '⏳ Loading...' : '📊 EM SHEET Ritesh Sir'}
+                    {emSheetLoading ? '⏳ Loading...' : '📊 EM Sheet Ritesh Sir'}
                   </button>
                 )}
               </div>
@@ -620,6 +929,17 @@ export default function Dashboard() {
         )}
       </main>
 
+      <EMSheetModal
+        isOpen={emSheetModalOpen}
+        onClose={() => setEmSheetModalOpen(false)}
+        data={emSheetData.employees}
+        weekInfo={emSheetData.weekInfo}
+        footer={emSheetData.footer}
+        onDownloadEM={() => downloadEMSheetPDF("em")}
+        onDownloadAll={() => downloadEMSheetPDF("all")}
+        loading={isUpdating}
+      />
+
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
@@ -631,7 +951,9 @@ export default function Dashboard() {
   );
 }
 
-// Memoized section block
+// ============================================================
+// MEMOIZED SECTION BLOCK
+// ============================================================
 const SectionBlock = React.memo(({ title, data, score, formatPercent, theme }) => {
   const baseTheme = theme === "blue" ? "from-blue-50" : theme === "emerald" ? "from-emerald-50" : "from-slate-50";
   return (
