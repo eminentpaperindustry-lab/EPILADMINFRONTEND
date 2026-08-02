@@ -17,7 +17,7 @@ export default function Delegation() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const [activeTab, setActiveTab] = useState("pending"); // pending / completed / approved
+  const [activeTab, setActiveTab] = useState("pending"); // pending / completed / approved / threeWeekAbove
   const [shiftTask, setShiftTask] = useState(null);
   const [shiftDate, setShiftDate] = useState("");
   const [loadingShiftBtn, setLoadingShiftBtn] = useState(false);
@@ -38,6 +38,10 @@ export default function Delegation() {
     Notes: "",
   });
 
+  // ✅ NEW: State for go to top button visibility
+  const [showGoToTop, setShowGoToTop] = useState(false);
+  const topRef = useRef(null);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
@@ -49,6 +53,20 @@ export default function Delegation() {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
+  }, []);
+
+  // ✅ NEW: Scroll listener for go to top button
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 300) {
+        setShowGoToTop(true);
+      } else {
+        setShowGoToTop(false);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   // -----------------------
@@ -109,6 +127,25 @@ export default function Delegation() {
     );
     
     return deadlineOnlyDate <= today;
+  }
+
+  // ✅ Check if a date is 3 weeks (21 days) old
+  function isThreeWeekAbove(deadlineDateStr) {
+    const deadlineDate = parseDDMMYYYY(deadlineDateStr);
+    if (!deadlineDate) return false;
+    
+    const today = getTodayStart();
+    const deadlineOnlyDate = new Date(
+      deadlineDate.getFullYear(),
+      deadlineDate.getMonth(),
+      deadlineDate.getDate()
+    );
+    
+    // Calculate difference in days
+    const diffTime = today.getTime() - deadlineOnlyDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays > 21; // 3 weeks = 21 days
   }
 
   // ----------------------- Download Report
@@ -337,6 +374,81 @@ export default function Delegation() {
     setShowDownloadDropdown(false);
   };
 
+  // ✅ NEW: Download 3 Week Above Report
+  const downloadDelegationReportThreeWeekAbove = () => {
+    if (!selectedEmp) {
+      toast.warn("Select employee first");
+      return;
+    }
+
+    const filtered = tasks.filter(
+      t => isThreeWeekAbove(t.Deadline) && 
+           t.Status !== "Completed" && 
+           t.Taskcompletedapproval !== "Approved"
+    );
+
+    if (filtered.length === 0) {
+      toast.info("No 3 week above tasks to download");
+      return;
+    }
+
+    filtered.sort((a, b) => {
+      const nameCompare = (a.Name || "").localeCompare(b.Name || "");
+      if (nameCompare !== 0) return nameCompare;
+      return (a.Status || "").localeCompare(b.Status || "");
+    });
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    doc.setFontSize(14);
+    doc.text(`3 Week Above Tasks Report - ${selectedEmp}`, 14, 15);
+
+    autoTable(doc, {
+      head: [[
+        "Name",
+        "Task Name",
+        "Created Date",
+        "Deadline",
+        "Final Date",
+        "Revisions",
+        "Status"
+      ]],
+      body: filtered.map(t => [
+        t.Name || "",
+        t.TaskName || "",
+        t.CreatedDate || "--",
+        t.Deadline || "--",
+        t.FinalDate || "--",
+        t.Revisions || "--",
+        t.Status 
+      ]),
+      startY: 22,
+      theme: "grid",
+      styles: {
+        fontSize: 9,
+        cellPadding: 2,
+        overflow: "linebreak",
+      },
+      columnStyles: {
+        1: { cellWidth: 60 },
+        0: { cellWidth: 20 }
+      },
+    });
+
+    doc.save(
+      `delegation_report_3weekabove_${selectedEmp}_${new Date()
+        .toISOString()
+        .slice(0, 10)}.pdf`
+    );
+
+    toast.success("3 Week Above report downloaded");
+    setShowDownloadDropdown(false);
+  };
+
   const sendPendingDelegationWhatsApp = async () => {
     if (!selectedEmp) {
       toast.warn("Select employee first");
@@ -344,7 +456,6 @@ export default function Delegation() {
     }
 
     try {
-      // ✅ FIXED: Use proper date comparison
       const pending = tasks.filter(t => 
         isTodayOrPast(t.Deadline) && 
         t.Status !== "Completed"
@@ -355,20 +466,19 @@ export default function Delegation() {
         return;
       }
 
-      // helper
       const sendWA = async (empName, empNumber, empTasks) => {
         if (!empNumber || empTasks.length === 0) return;
 
         const payload = {
           number: `91${empNumber}`,
           employeeName: empName,
-          delegations: empTasks.map(t => t.TaskName) // ✅ ARRAY
+          delegations: empTasks.map(t => t.TaskName)
         };
 
-        console.log("WA Payload 👉", payload); // 🧪 DEBUG (important)
+        console.log("WA Payload 👉", payload);
 
         await axios.post(
-          "/whatsapp/send-delegation",   // ✅ CORRECT API
+          "/whatsapp/send-delegation",
           payload,
           {
             headers: { Authorization: `Bearer ${user.token}` }
@@ -376,7 +486,6 @@ export default function Delegation() {
         );
       };
 
-      // 🔹 ALL case
       if (selectedEmp === "all") {
         const map = {};
 
@@ -398,7 +507,6 @@ export default function Delegation() {
         return;
       }
 
-      // 🔹 Single employee
       const empTasks = pending.filter(t => t.Name === selectedEmp);
       if (empTasks.length === 0) {
         toast.info("No pending tasks");
@@ -420,7 +528,6 @@ export default function Delegation() {
     }
   };
 
-  // ✅ FIXED: delegationFlowup with proper date comparison
   const delegationFlowup = async () => {
     try {
       if (!selectedEmp) {
@@ -428,7 +535,6 @@ export default function Delegation() {
         return;
       }
 
-      // 🔹 Pending tasks with proper date comparison
       const pending = tasks.filter(t => 
         isTodayOrPast(t.Deadline) && 
         t.Status !== "Completed" &&
@@ -437,7 +543,7 @@ export default function Delegation() {
 
       if (pending.length === 0) {
         toast.info("No pending tasks");
-        return; // 🚫 NO WINDOW OPEN
+        return;
       }
 
       const emp = employees.find(e => e.name === selectedEmp);
@@ -446,7 +552,6 @@ export default function Delegation() {
         return;
       }
 
-      // 🔹 Beautiful numbered task list
       const taskList = pending
         .map((t, i) => `${i + 1}. ${t.TaskName}`)
         .join("\n");
@@ -462,7 +567,6 @@ ${taskList}
 Thanks`
       );
 
-      // 🔥 OPEN WHATSAPP ONLY WHEN EVERYTHING IS READY
       const whatsappWindow = window.open(
         `https://wa.me/${emp.number}?text=${message}`,
         "_blank"
@@ -718,7 +822,7 @@ Thanks`
     setEditTask(task);
     setForm({
       TaskName: task.TaskName,
-      Deadline: task.Deadline, // sirf show ke liye, edit nahi hoga
+      Deadline: task.Deadline,
       Priority: task.Priority,
       Notes: task.Followup,
     });
@@ -733,7 +837,7 @@ Thanks`
     setLoadingTaskId("update");
     try {
       const payload = {
-        TaskName: form.TaskName, // ✅ ONLY NAME
+        TaskName: form.TaskName,
       };
 
       await axios.put(`/delegations/update/${editTask.TaskID}`, payload, {
@@ -783,7 +887,7 @@ Thanks`
     return nameA.localeCompare(nameB);
   });
 
-  // ✅ MAIN FILTER - UPDATED with proper date comparison
+  // ✅ MAIN FILTER - UPDATED with threeWeekAbove tab
   const today = getTodayStart();
 
   const filteredTasks = sortedTasks.filter((t) => {
@@ -820,16 +924,61 @@ Thanks`
       );
 
       return (
-        deadlineOnlyDate <= today &&   // ✅ aaj + past (includes month/year properly)
+        deadlineOnlyDate <= today &&
         t.Status !== "Completed"
+      );
+    }
+    // ✅ NEW: Three Week Above Tab
+    else if (activeTab === "threeWeekAbove") {
+      return (
+        isThreeWeekAbove(t.Deadline) &&
+        t.Status !== "Completed" &&
+        (!t.Taskcompletedapproval ||
+          t.Taskcompletedapproval === "Pending" ||
+          t.Taskcompletedapproval === "NotApproved")
       );
     }
 
     return false;
   });
 
+  // ✅ NEW: Go to top function
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  };
+
   return (
-    <div className="p-4 max-w-4xl mx-auto">
+    <div className="p-4 max-w-4xl mx-auto" ref={topRef}>
+      {/* ✅ NEW: Go to Top Button */}
+      {selectedEmp && showGoToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 z-50 flex items-center justify-center"
+          style={{
+            width: "56px",
+            height: "56px",
+          }}
+          title="Go to Top"
+        >
+          <svg 
+            className="w-6 h-6" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M5 10l7-7m0 0l7 7m-7-7v18" 
+            />
+          </svg>
+        </button>
+      )}
+
       {/* Employee Select */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         {/* Select Employee */}
@@ -871,13 +1020,12 @@ Thanks`
             value={assignBy}
             onChange={(e) => setAssignBy(e.target.value)}
           >
-            {/* Placeholder – dropdown me nahi dikhega */}
             <option value="" disabled hidden>
               -- Select Assign By --
             </option>
 
             {admin
-              .filter(emp => typeof emp?.name === "string" && emp.name.trim() !== "")   // safety
+              .filter(emp => typeof emp?.name === "string" && emp.name.trim() !== "")
               .sort((a, b) =>
                 a.name.toLowerCase().localeCompare(b.name.toLowerCase())
               )
@@ -934,12 +1082,30 @@ Thanks`
                 >
                   ✅ Only Completed Tasks
                 </button>
+                {/* ✅ NEW: 3 Week Above Download button */}
+                <button
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t"
+                  onClick={downloadDelegationReportThreeWeekAbove}
+                >
+                  📅 3 Week Above Tasks
+                </button>
               </div>
             )}
           </div>
 
           <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={delegationFlowup}>
             Pending Delegation Whatsapp Flowup
+          </button>
+
+          {/* ✅ NEW: Quick Scroll to Top Button */}
+          <button
+            onClick={scrollToTop}
+            className="bg-indigo-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-indigo-700 transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+            </svg>
+            Go to Top
           </button>
         </div>
       )}
@@ -990,7 +1156,7 @@ Thanks`
 
       {!loading && selectedEmp && (
         <>
-          {/* Tabs */}
+          {/* Tabs - Updated with 3 Week Above */}
           <div className="flex gap-3 mb-6 flex-wrap">
             <button
               className={`px-3 py-2 rounded ${
@@ -1007,6 +1173,14 @@ Thanks`
               onClick={() => setActiveTab("Today_Followup")}
             >
               Today Followup
+            </button>
+            <button
+              className={`px-3 py-2 rounded ${
+                activeTab === "threeWeekAbove" ? "bg-red-600 text-white" : "bg-gray-300"
+              }`}
+              onClick={() => setActiveTab("threeWeekAbove")}
+            >
+              ⚠️ 3 Week Above
             </button>
             <button
               className={`px-3 py-2 rounded ${
@@ -1029,7 +1203,12 @@ Thanks`
           {/* Task List */}
           <div className="grid gap-4 max-h-[500px] overflow-y-auto">
             {filteredTasks.map((task) => (
-              <div key={task.TaskID} className="p-4 bg-white rounded shadow border">
+              <div 
+                key={task.TaskID} 
+                className={`p-4 bg-white rounded shadow border ${
+                  activeTab === "threeWeekAbove" ? "border-red-500 border-2" : ""
+                }`}
+              >
                 <div className="flex justify-between">
                   <div>
                     <div className="font-semibold text-lg">{task.TaskName}</div>
@@ -1040,6 +1219,11 @@ Thanks`
                       Revision: {task.Revisions || "0"},<span/><span/>
                       Name: {task.Name || "_"}
                     </div>
+                    {activeTab === "threeWeekAbove" && (
+                      <div className="text-sm text-red-600 font-semibold mt-1">
+                        ⚠️ Overdue by 3+ weeks
+                      </div>
+                    )}
                   </div>
                   <span
                     className={`px-2 py-1 rounded text-sm ${
@@ -1083,6 +1267,13 @@ Thanks`
                 )}
               </div>
             ))}
+            
+            {/* Show message when no tasks in 3 Week Above tab */}
+            {activeTab === "threeWeekAbove" && filteredTasks.length === 0 && (
+              <div className="text-center text-gray-500 py-8">
+                No tasks that are 3 weeks overdue 🎉
+              </div>
+            )}
           </div>
         </>
       )}

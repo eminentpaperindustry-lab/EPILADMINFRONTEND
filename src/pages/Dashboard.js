@@ -1,980 +1,1420 @@
-import React, { useState, useEffect, useContext, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useRef, useContext } from "react";
 import axios from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import axiosLib from "axios";
 
-// ============================================================
-// MEMOIZED SUB-COMPONENTS
-// ============================================================
+export default function Delegation() {
+  const { user } = useContext(AuthContext);
+  const [assignBy, setAssignBy] = useState("");
 
-const THEMES = {
-  blue: "bg-blue-600 text-white",
-  amber: "bg-amber-500 text-white",
-  emerald: "bg-emerald-600 text-white",
-  indigo: "bg-indigo-600 text-white",
-  rose: "bg-rose-600 text-white",
-  slate: "bg-slate-700 text-white",
-};
-
-const MiniCard = React.memo(({ title, value, theme }) => (
-  <div className={`${THEMES[theme]} p-3 rounded-lg text-center shadow transition-all duration-300 hover:scale-105`}>
-    <h3 className="text-[9px] uppercase font-black opacity-90">{title}</h3>
-    <p className="text-lg font-black mt-1">{value || 0}</p>
-  </div>
-));
-
-const Card = React.memo(({ title, value, theme }) => (
-  <div className={`${THEMES[theme]} p-4 rounded-xl text-center shadow transition-all duration-300 hover:scale-105 hover:rotate-1`}>
-    <h3 className="text-[10px] uppercase font-black opacity-80">{title}</h3>
-    <p className="text-xl font-black">{value || 0}</p>
-  </div>
-));
-
-const SingleSection = React.memo(({ title, data, showScore = false, formatPercent = (val) => val }) => {
-  const score = useMemo(() => {
-    if (!showScore) return null;
-    const pendingPercent = parseFloat(data?.pendingPercent || 0);
-    const delayPercent = parseFloat(data?.delayPercent || 0);
-    return `-${((pendingPercent * 0.80) + (delayPercent * 0.20)).toFixed(2)}`;
-  }, [showScore, data?.pendingPercent, data?.delayPercent]);
-
-  if (!data || Object.keys(data).length === 0) return null;
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-lg transition-all overflow-hidden group">
-      <div className="px-6 py-3 border-b bg-slate-50 group-hover:bg-indigo-50 transition-colors">
-        <h2 className="font-black uppercase text-slate-700 group-hover:text-indigo-700">{title}</h2>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 p-6">
-        <Card title="Total Work" value={data.totalWork || 0} theme="slate" />
-        <Card title="Completed" value={data.completedWork || data.totalCompleted || 0} theme="emerald" />
-        <Card title="On Time" value={data.onTimeWork || data.totalOnTime || 0} theme="emerald" />
-        <Card title="Pending" value={data.pendingWork || data.totalPending || 0} theme="amber" />
-        <Card title="Pending %" value={formatPercent(data.pendingPercent)} theme="indigo" />
-        <Card title="Delay %" value={formatPercent(data.delayPercent)} theme="rose" />
-        {showScore && <Card title="Overall Score" value={score || formatPercent(data.overallScore)} theme="blue" />}
-      </div>
-    </div>
-  );
-});
-
-// ============================================================
-// EM SHEET MODAL COMPONENT - WITH PERCENTAGE BASED TOGGLES (FIXED)
-// ============================================================
-const EMSheetModal = React.memo(({ 
-  isOpen, 
-  onClose, 
-  data, 
-  weekInfo, 
-  footer, 
-  onDownloadEM, 
-  onDownloadAll,
-  loading 
-}) => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [withoutDelToggle, setWithoutDelToggle] = useState(false);
-  const [delegationToggle, setDelegationToggle] = useState(false);
-  const [activeSort, setActiveSort] = useState('without');
-  const rowsPerPage = 30;
-
-  const validData = useMemo(() => {
-    if (!isOpen) return [];
-    if (!data || !Array.isArray(data)) return [];
-    return data.filter(emp => 
-      emp.doerName && 
-      emp.doerName !== "DOER NAME" && 
-      emp.doerName !== "DOER NAME " &&
-      !emp.doerName.includes("WEEK NO.")
-    );
-  }, [data, isOpen]);
-
-  const extractPercentage = (percentStr) => {
-    if (!percentStr) return 0;
-    if (typeof percentStr === 'number') return percentStr;
-    if (typeof percentStr === 'string') {
-      const num = parseFloat(percentStr.replace('%', ''));
-      return isNaN(num) ? 0 : num;
-    }
-    return 0;
-  };
-
-  const sortedWithoutDelData = useMemo(() => {
-    if (!isOpen) return [];
-    return [...validData].sort((a, b) => {
-      const aPercent = extractPercentage(a.withoutDelegation?.percent);
-      const bPercent = extractPercentage(b.withoutDelegation?.percent);
-      return withoutDelToggle ? bPercent - aPercent : aPercent - bPercent;
-    });
-  }, [validData, withoutDelToggle, isOpen]);
-
-  const sortedDelegationData = useMemo(() => {
-    if (!isOpen) return [];
-    return [...validData].sort((a, b) => {
-      const aPercent = extractPercentage(a.delegation?.percent);
-      const bPercent = extractPercentage(b.delegation?.percent);
-      return delegationToggle ? bPercent - aPercent : aPercent - bPercent;
-    });
-  }, [validData, delegationToggle, isOpen]);
-
-  const displayData = useMemo(() => {
-    if (activeSort === 'without') {
-      return sortedWithoutDelData;
-    }
-    if (activeSort === 'delegation') {
-      return sortedDelegationData;
-    }
-    return sortedWithoutDelData;
-  }, [sortedWithoutDelData, sortedDelegationData, activeSort]);
-
-  const emDoers = useMemo(() => {
-    if (!isOpen) return [];
-    return validData.filter(emp => emp.emDoer === "YES");
-  }, [validData, isOpen]);
-
-  const totalPages = useMemo(() => {
-    if (!isOpen) return 1;
-    return Math.ceil(displayData.length / rowsPerPage);
-  }, [displayData, isOpen]);
-
-  const paginatedData = useMemo(() => {
-    if (!isOpen) return [];
-    const start = (currentPage - 1) * rowsPerPage;
-    const end = start + rowsPerPage;
-    return displayData.slice(start, end);
-  }, [displayData, currentPage, isOpen]);
-
-  if (!isOpen) return null;
-
-  const toggleWithoutDelegation = () => {
-    const newState = !withoutDelToggle;
-    setWithoutDelToggle(newState);
-    setActiveSort('without');
-    if (newState) {
-      setDelegationToggle(false);
-    }
-    setCurrentPage(1);
-    
-    const tableElement = document.getElementById('em-sheet-table');
-    if (tableElement) {
-      tableElement.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  const toggleDelegation = () => {
-    const newState = !delegationToggle;
-    setDelegationToggle(newState);
-    setActiveSort('delegation');
-    if (newState) {
-      setWithoutDelToggle(false);
-    }
-    setCurrentPage(1);
-    
-    const tableElement = document.getElementById('em-sheet-table');
-    if (tableElement) {
-      tableElement.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  const resetSort = () => {
-    setWithoutDelToggle(false);
-    setDelegationToggle(false);
-    setActiveSort('without');
-    setCurrentPage(1);
-    const tableElement = document.getElementById('em-sheet-table');
-    if (tableElement) {
-      tableElement.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  const getSortInfo = () => {
-    if (activeSort === 'without' && withoutDelToggle) return '⬇️ Without Del - High to Low %';
-    if (activeSort === 'without' && !withoutDelToggle) return '⬆️ Without Del - Low to High %';
-    if (activeSort === 'delegation' && delegationToggle) return '⬇️ Delegation - High to Low %';
-    if (activeSort === 'delegation' && !delegationToggle) return '⬆️ Delegation - Low to High %';
-    return '⬆️ Without Del - Low to High %';
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col animate-fadeIn">
-        <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-blue-600 text-white p-4 rounded-t-2xl flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-black uppercase tracking-wider">📊 EM Sheet</h2>
-            <p className="text-xs text-blue-200 font-bold">{weekInfo || "Loading..."}</p>
-          </div>
-          <button 
-            onClick={onClose}
-            className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex flex-wrap gap-4 p-4 bg-slate-50 border-b">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-600">Total Employees:</span>
-            <span className="text-sm font-black text-indigo-600">{validData.length}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-600">EM Doers:</span>
-            <span className="text-sm font-black text-rose-600">{emDoers.length}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-600">Page:</span>
-            <span className="text-sm font-black text-blue-600">{currentPage} / {totalPages || 1}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-600">Sorting:</span>
-            <span className="text-sm font-black text-indigo-600">
-              {getSortInfo()}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-3 p-4 bg-white border-b">
-          <button 
-            onClick={toggleWithoutDelegation}
-            className={`px-4 py-2 text-white text-xs font-black rounded-lg transition-all active:scale-95 flex items-center gap-2 ${
-              activeSort === 'without' && withoutDelToggle ? 'bg-blue-600 hover:bg-blue-700' : 
-              activeSort === 'without' && !withoutDelToggle ? 'bg-indigo-600 hover:bg-indigo-700' :
-              'bg-slate-500 hover:bg-slate-600'
-            }`}
-          >
-            {activeSort === 'without' && withoutDelToggle ? '⬇️ Without Del - High to Low %' : 
-             activeSort === 'without' && !withoutDelToggle ? '⬆️ Without Del - Low to High %' :
-             '📊 Without Del'}
-          </button>
-
-          <button 
-            onClick={toggleDelegation}
-            className={`px-4 py-2 text-white text-xs font-black rounded-lg transition-all active:scale-95 flex items-center gap-2 ${
-              activeSort === 'delegation' && delegationToggle ? 'bg-blue-600 hover:bg-blue-700' : 
-              activeSort === 'delegation' && !delegationToggle ? 'bg-indigo-600 hover:bg-indigo-700' :
-              'bg-slate-500 hover:bg-slate-600'
-            }`}
-          >
-            {activeSort === 'delegation' && delegationToggle ? '⬇️ Delegation - High to Low %' : 
-             activeSort === 'delegation' && !delegationToggle ? '⬆️ Delegation - Low to High %' :
-             '📊 Delegation'}
-          </button>
-
-          <button 
-            onClick={resetSort}
-            className="px-4 py-2 bg-slate-600 text-white text-xs font-black rounded-lg hover:bg-slate-700 transition-all active:scale-95 flex items-center gap-2"
-          >
-            🔄 Reset Sort
-          </button>
-
-          <button 
-            onClick={onDownloadEM}
-            disabled={loading}
-            className={`px-4 py-2 text-white text-xs font-black rounded-lg transition-all active:scale-95 flex items-center gap-2 ${
-              loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700'
-            }`}
-          >
-            📥 Download EM Only
-          </button>
-          <button 
-            onClick={onDownloadAll}
-            disabled={loading}
-            className={`px-4 py-2 text-white text-xs font-black rounded-lg transition-all active:scale-95 flex items-center gap-2 ${
-              loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'
-            }`}
-          >
-            📥 Download All
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-auto p-4" id="em-sheet-table">
-          {validData.length === 0 ? (
-            <div className="text-center py-10">
-              <p className="text-slate-400 font-bold">No data available</p>
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-blue-700 text-white">
-                      <th rowSpan="2" className="border border-black/20 p-1.5 text-center font-bold" style={{minWidth: '35px'}}>NO</th>
-                      <th rowSpan="2" className="border border-black/20 p-1.5 text-center font-bold" style={{minWidth: '100px'}}>DOER NAME</th>
-                      <th colSpan="4" className="border border-black/20 p-1.5 text-center font-bold">WITHOUT DELEGATION</th>
-                      <th colSpan="5" className="border border-black/20 p-1.5 text-center font-bold">DELEGATION</th>
-                      <th rowSpan="2" className="border border-black/20 p-1.5 text-center font-bold" style={{minWidth: '60px'}}>EM DOER</th>
-                    </tr>
-                    <tr className="bg-blue-600 text-white">
-                      <th className="border border-black/20 p-1.5 text-center">TOTAL</th>
-                      <th className="border border-black/20 p-1.5 text-center">PENDING</th>
-                      <th className="border border-black/20 p-1.5 text-center">%</th>
-                      <th className="border border-black/20 p-1.5 text-center">EM REP.</th>
-                      <th className="border border-black/20 p-1.5 text-center">TOTAL</th>
-                      <th className="border border-black/20 p-1.5 text-center">PENDING</th>
-                      <th className="border border-black/20 p-1.5 text-center">%</th>
-                      <th className="border border-black/20 p-1.5 text-center">EM REP.</th>
-                      <th className="border border-black/20 p-1.5 text-center">NEXT TARGET</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedData.map((emp, idx) => {
-                      const rowNum = (currentPage - 1) * rowsPerPage + idx + 1;
-                      const isEMDoer = emp.emDoer === "YES";
-                      const withoutDelegation = emp.withoutDelegation || {};
-                      const delegation = emp.delegation || {};
-                      
-                      return (
-                        <tr key={idx} className={`${isEMDoer ? 'bg-rose-50' : 'hover:bg-blue-50'} transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                          <td className="border border-black/20 p-1.5 text-center font-bold">{rowNum}</td>
-                          <td className="border border-black/20 p-1.5 text-left font-medium">{emp.doerName || ""}</td>
-                          <td className="border border-black/20 p-1.5 text-center">{withoutDelegation.totalTask || 0}</td>
-                          <td className="border border-black/20 p-1.5 text-center">{withoutDelegation.pendingTask || 0}</td>
-                          <td className="border border-black/20 p-1.5 text-center font-bold text-blue-600">{withoutDelegation.percent || "0%"}</td>
-                          <td className="border border-black/20 p-1.5 text-center">{withoutDelegation.emRepetition || ""}</td>
-                          <td className="border border-black/20 p-1.5 text-center">{delegation.totalTask || 0}</td>
-                          <td className="border border-black/20 p-1.5 text-center">{delegation.pendingTask || 0}</td>
-                          <td className="border border-black/20 p-1.5 text-center font-bold text-indigo-600">{delegation.percent || "0%"}</td>
-                          <td className="border border-black/20 p-1.5 text-center">{delegation.emRepetition || ""}</td>
-                          <td className="border border-black/20 p-1.5 text-center">{delegation.nextTarget || ""}</td>
-                          <td className={`border border-black/20 p-1.5 text-center font-bold ${isEMDoer ? 'text-rose-600' : 'text-emerald-600'}`}>
-                            {emp.emDoer || "NO"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {totalPages > 1 && (
-                <div className="flex justify-center items-center gap-2 mt-4">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1 bg-slate-200 text-slate-700 text-xs font-bold rounded disabled:opacity-50 hover:bg-slate-300 transition-colors"
-                  >
-                    Previous
-                  </button>
-                  <span className="text-xs font-bold text-slate-600">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1 bg-slate-200 text-slate-700 text-xs font-bold rounded disabled:opacity-50 hover:bg-slate-300 transition-colors"
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          {footer && footer.length > 0 && (
-            <div className="mt-6 border-t pt-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                {footer.map((item, idx) => {
-                  let label = "";
-                  let value = "";
-                  if (typeof item === 'string') {
-                    label = item;
-                  } else if (typeof item === 'object') {
-                    label = item.label || "";
-                    value = item.value || "";
-                  }
-                  return (
-                    <div key={idx} className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                      <span className="text-[10px] font-bold text-slate-500">{label}</span>
-                      <span className="text-xs font-black text-slate-700 ml-2">{value}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="sticky bottom-0 bg-slate-50 p-4 rounded-b-2xl border-t flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-slate-600 text-white text-sm font-bold rounded-lg hover:bg-slate-700 transition-colors"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-});
-
-// ============================================================
-// MAIN DASHBOARD COMPONENT
-// ============================================================
-export default function Dashboard() {
-  const { user, token } = useContext(AuthContext);
-
-  const isEminentAdmin = useMemo(() => {
-    const company = user?.company || user?.companyName || "";
-    return company === "Eminent";
-  }, [user]);
-
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [selectedWeek, setSelectedWeek] = useState(1);
-  const [selectedEmployee, setSelectedEmployee] = useState("all");
   const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [weekRange, setWeekRange] = useState({ start: "", end: "" });
-  const [allDashboardData, setAllDashboardData] = useState([]);
-  const [emSheetModalOpen, setEmSheetModalOpen] = useState(false);
-  const [emSheetData, setEmSheetData] = useState({ employees: [], weekInfo: "", footer: [] });
-  const [emSheetLoading, setEmSheetLoading] = useState(false);
+  const [admin, setAdmin] = useState([]);
 
-  const loadEmployees = useCallback(async () => {
-    try {
-      const res = await axios.get("/employee/all", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setEmployees(res.data || []);
-    } catch (err) {
-      console.error(err);
-    }
-  }, [token]);
+  const [selectedEmp, setSelectedEmp] = useState("");
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const loadAllDashboard = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await axios.get("/allDashboard/all-dashboard", {
-        params: {
-          month: selectedMonth,
-          week: selectedWeek,
-          selectedName: selectedEmployee === "all" ? "" : selectedEmployee,
-        },
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setAllDashboardData(res.data.data || []);
-      setWeekRange({ start: res.data.weekStart, end: res.data.weekEnd });
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [token, selectedEmployee, selectedMonth, selectedWeek]);
+  const [activeTab, setActiveTab] = useState("pending"); // pending / completed / approved / threeWeekAbove
+  const [shiftTask, setShiftTask] = useState(null);
+  const [shiftDate, setShiftDate] = useState("");
+  const [loadingShiftBtn, setLoadingShiftBtn] = useState(false);
+  const [loadingTaskId, setLoadingTaskId] = useState(null);
+  const [loadingApprovalId, setLoadingApprovalId] = useState(null);
 
-  const loadEMSheetData = useCallback(async () => {
-    try {
-      setEmSheetLoading(true);
-      const response = await axios.get("/em-sheet/em-sheet", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+  const [editTask, setEditTask] = useState(null);  // For editing task
+  const [deleteTaskId, setDeleteTaskId] = useState(null); // For delete task confirmation
+  const whatsappRef = useRef(null);
 
-      if (response.data.success) {
-        setEmSheetData({
-          employees: response.data.data?.employees || [],
-          weekInfo: response.data.data?.weekInfo || "",
-          footer: response.data.data?.footer || []
-        });
-        setEmSheetModalOpen(true);
-      } else {
-        alert("Failed to fetch EM Sheet data: " + (response.data.error || "Unknown error"));
+  const [showCreate, setShowCreate] = useState(false);
+  const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+  const [form, setForm] = useState({
+    TaskName: "",
+    Deadline: "",
+    Priority: "",
+    Notes: "",
+  });
+
+  // ✅ NEW: Sort states
+  const [sortBy, setSortBy] = useState(""); // "" = default, "deadline", "createdDate"
+  const [sortOrder, setSortOrder] = useState("asc"); // "asc" or "desc"
+
+  // ✅ NEW: Go to top button visibility
+  const [showGoToTop, setShowGoToTop] = useState(false);
+  const topRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDownloadDropdown(false);
       }
-    } catch (error) {
-      console.error("Error loading EM Sheet:", error);
-      alert("Error loading EM Sheet: " + (error.response?.data?.error || error.message));
-    } finally {
-      setEmSheetLoading(false);
     }
-  }, [token]);
-
-  useEffect(() => { loadEmployees(); }, [loadEmployees]);
-  useEffect(() => { loadAllDashboard(); }, [loadAllDashboard]);
-
-  const formatPercent = useCallback((value) => {
-    if (!value && value !== 0) return "0.00%";
-    const num = parseFloat(value);
-    if (isNaN(num)) return "0.00%";
-    return num < 0 ? `${num.toFixed(2)}%` : `-${num.toFixed(2)}%`;
-  }, []);
-
-  const calculateWithoutDelegation = useCallback((emp) => {
-    const checklist = emp.checklist || {};
-    const helpAssigned = emp.helpTicket?.assigned || {};
-    const supportAssigned = emp.supportTicket?.assigned || {};
-    const totalWork = (checklist.totalWork || 0) + (helpAssigned.totalWork || 0) + (supportAssigned.totalWork || 0);
-    const completedWork = (checklist.completedWork || 0) + (helpAssigned.completedWork || 0) + (supportAssigned.completedWork || 0);
-    const pendingWork = (checklist.pendingWork || 0) + (helpAssigned.pendingWork || 0) + (supportAssigned.pendingWork || 0);
-    const onTimeWork = (checklist.onTimeWork || 0) + (helpAssigned.onTimeWork || 0) + (supportAssigned.onTimeWork || 0);
-    const pendingPercent = totalWork > 0 ? ((pendingWork / totalWork) * 100) : 0;
-    const delayPercent = totalWork > 0 ? (((totalWork - onTimeWork) / totalWork) * 100) : 0;
-    const overallScore = ((pendingPercent * 0.80) + (delayPercent * 0.20));
-    return { 
-      totalWork, 
-      completedWork, 
-      pendingWork, 
-      onTimeWork, 
-      pendingPercent: pendingPercent > 0 ? -pendingPercent : 0,
-      delayPercent: delayPercent > 0 ? -delayPercent : 0,
-      overallScore: overallScore > 0 ? -overallScore : 0 
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
-  const calculateDelegationOverall = useCallback((delegation) => {
-    const del = delegation || {};
-    const pendingPercent = parseFloat(del.pendingPercent) || 0;
-    const delayPercent = parseFloat(del.delayPercent) || 0;
-    const overall = ((pendingPercent * 0.80) + (delayPercent * 0.20));
-    return overall > 0 ? -overall : 0;
+  // ✅ NEW: Scroll listener for go to top button
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 300) {
+        setShowGoToTop(true);
+      } else {
+        setShowGoToTop(false);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const downloadEMSheetPDF = useCallback(async (filterType = "all") => {
+  // -----------------------
+  function formatDateDDMMYYYYHHMMSS(date = new Date()) {
+    const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(utc + istOffset);
+
+    const dd = String(istDate.getDate()).padStart(2, "0");
+    const mm = String(istDate.getMonth() + 1).padStart(2, "0");
+    const yyyy = istDate.getFullYear();
+    const hh = String(istDate.getHours()).padStart(2, "0");
+    const min = String(istDate.getMinutes()).padStart(2, "0");
+    const ss = String(istDate.getSeconds()).padStart(2, "0");
+
+    return `${dd}/${mm}/${yyyy} ${hh}:${min}:${ss}`;
+  }
+
+  // ✅ Convert "dd/mm/yyyy" or "dd/mm/yyyy hh:mm:ss" → Date object
+  function parseDDMMYYYY(dateStr) {
+    if (!dateStr) return null;
+
     try {
-      setIsUpdating(true);
-      
-      const response = await axios.get("/em-sheet/em-sheet", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const [datePart, timePart] = dateStr.split(" ");
+      const [dd, mm, yyyy] = datePart.split("/");
+      const [hh = "00", min = "00", ss = "00"] = (timePart || "").split(":");
 
-      if (!response.data.success) {
-        alert("Failed to fetch EM Sheet data: " + (response.data.error || "Unknown error"));
-        setIsUpdating(false);
-        return;
-      }
-
-      let employeesData = response.data.data?.employees || [];
-      const weekInfo = response.data.data?.weekInfo || "";
-      const footer = response.data.data?.footer || [];
-      
-      let filteredData = employeesData.filter(emp => 
-        emp.doerName && 
-        emp.doerName !== "DOER NAME" && 
-        emp.doerName !== "DOER NAME " &&
-        !emp.doerName.includes("WEEK NO.")
+      return new Date(
+        Number(yyyy),
+        Number(mm) - 1,
+        Number(dd),
+        Number(hh),
+        Number(min),
+        Number(ss)
       );
+    } catch (err) {
+      console.error("Date parse error:", err);
+      return null;
+    }
+  }
 
-      if (filterType === "em") {
-        filteredData = filteredData.filter(emp => emp.emDoer === "YES");
-      }
+  // ✅ Get today's date WITHOUT time (for accurate date comparison)
+  function getTodayStart() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
 
-      if (filteredData.length === 0) {
-        alert("No data found to download!");
-        setIsUpdating(false);
-        return;
-      }
+  // ✅ Check if a date is today or in the past (compares year, month, day)
+  function isTodayOrPast(deadlineDateStr) {
+    const deadlineDate = parseDDMMYYYY(deadlineDateStr);
+    if (!deadlineDate) return false;
+    
+    const today = getTodayStart();
+    const deadlineOnlyDate = new Date(
+      deadlineDate.getFullYear(),
+      deadlineDate.getMonth(),
+      deadlineDate.getDate()
+    );
+    
+    return deadlineOnlyDate <= today;
+  }
 
-      const doc = new jsPDF("landscape", "mm", "a4");
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
+  // ✅ Check if a date is 3 weeks (21 days) old
+  function isThreeWeekAbove(deadlineDateStr) {
+    const deadlineDate = parseDDMMYYYY(deadlineDateStr);
+    if (!deadlineDate) return false;
+    
+    const today = getTodayStart();
+    const deadlineOnlyDate = new Date(
+      deadlineDate.getFullYear(),
+      deadlineDate.getMonth(),
+      deadlineDate.getDate()
+    );
+    
+    // Calculate difference in days
+    const diffTime = today.getTime() - deadlineOnlyDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays > 21; // 3 weeks = 21 days
+  }
 
-      const addTitle = (docInstance) => {
-        docInstance.setFillColor(255, 235, 156);
-        docInstance.rect(10, 8, pageWidth - 20, 9, "F");
-        docInstance.setFontSize(12);
-        docInstance.setTextColor(0, 0, 0);
-        docInstance.setFont("helvetica", "bold");
-        const titleText = weekInfo || `WEEK NO.-${selectedWeek} ( ${weekRange.start} TO ${weekRange.end} )`;
-        docInstance.text(titleText, pageWidth / 2, 14.5, { align: "center" });
-      };
+  // ✅ NEW: Sort functions
+  const sortTasks = (tasksToSort) => {
+    if (!sortBy) return tasksToSort;
 
-      const headers = [
-        [
-          { content: "NO", rowSpan: 2 },
-          { content: "DOER NAME", rowSpan: 2 },
-          { content: "WITHOUT DELEGATION", colSpan: 4 },
-          { content: "DELEGATION", colSpan: 5 },
-          { content: "EM DOER", rowSpan: 2 }
-        ],
-        [
-          "TOTAL",
-          "PENDING",
-          "%",
-          "EM REP.",
-          "TOTAL",
-          "PENDING",
-          "%",
-          "EM REP.",
-          "NEXT TARGET",
-          ""
-        ]
-      ];
-
-      const fontSize = 6;
-      const pageSize = 30;
-      const pages = [];
-      for (let i = 0; i < filteredData.length; i += pageSize) {
-        pages.push(filteredData.slice(i, i + pageSize));
-      }
-
-      pages.forEach((pageData, pageIndex) => {
-        if (pageIndex > 0) {
-          doc.addPage();
-        }
-        addTitle(doc);
-
-        const bodyData = pageData.map((emp, index) => {
-          const startIndex = pageIndex * pageSize;
-          const rowNum = startIndex + index + 1;
-          const withoutDelegation = emp.withoutDelegation || {};
-          const delegation = emp.delegation || {};
-          
-          return [
-            rowNum,
-            emp.doerName || "",
-            withoutDelegation.totalTask || 0,
-            withoutDelegation.pendingTask || 0,
-            withoutDelegation.percent || "0%",
-            withoutDelegation.emRepetition || "",
-            delegation.totalTask || 0,
-            delegation.pendingTask || 0,
-            delegation.percent || "0%",
-            delegation.emRepetition || "",
-            delegation.nextTarget || "",
-            emp.emDoer || "NO"
-          ];
-        });
-
-        autoTable(doc, {
-          head: headers,
-          body: bodyData,
-          startY: 22,
-          theme: 'grid',
-          styles: {
-            fontSize: fontSize,
-            halign: 'center',
-            valign: 'middle',
-            lineColor: [0, 0, 0],
-            lineWidth: 0.1,
-            cellPadding: 0.8,
-            minCellHeight: 4.5,
-          },
-          headStyles: {
-            fillColor: [0, 102, 204],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-            fontSize: fontSize + 0.5,
-            halign: 'center',
-            valign: 'middle',
-          },
-          columnStyles: {
-            0: { cellWidth: 8 },
-            1: { cellWidth: 28 },
-            2: { cellWidth: 14 },
-            3: { cellWidth: 14 },
-            4: { cellWidth: 14 },
-            5: { cellWidth: 18 },
-            6: { cellWidth: 14 },
-            7: { cellWidth: 14 },
-            8: { cellWidth: 14 },
-            9: { cellWidth: 18 },
-            10: { cellWidth: 16 },
-            11: { cellWidth: 10 },
-          },
-          tableWidth: 'auto',
-          margin: { left: 6, right: 6 },
-          pageBreak: 'avoid',
-        });
-      });
-
-      if (footer && footer.length > 0) {
-        const footerStartY = pageHeight - 25;
-        const footerData = footer.map(f => {
-          if (typeof f === 'object') {
-            return [f.label || "", f.value || ""];
-          }
-          return [f, ""];
-        });
-        
-        autoTable(doc, {
-          body: footerData,
-          startY: footerStartY,
-          theme: 'grid',
-          styles: {
-            fontSize: 5.5,
-            halign: 'center',
-            valign: 'middle',
-            lineColor: [0, 0, 0],
-            lineWidth: 0.1,
-            cellPadding: 1,
-          },
-          headStyles: {
-            fillColor: [198, 224, 180],
-            textColor: [0, 0, 0],
-            fontStyle: 'bold',
-            fontSize: 5.5,
-          },
-          columnStyles: {
-            0: { cellWidth: 85 },
-            1: { cellWidth: 40 },
-          },
-          tableWidth: 125,
-          margin: { left: pageWidth - 135 },
-          pageBreak: 'avoid',
-        });
-      }
-
-      const fileName = filterType === "em" ? `EM_ONLY_${selectedWeek}.pdf` : `EM_SHEET_${selectedWeek}.pdf`;
-      doc.save(fileName);
-      setIsUpdating(false);
+    const sorted = [...tasksToSort];
+    
+    sorted.sort((a, b) => {
+      let dateA, dateB;
       
-    } catch (error) {
-      console.error("Error:", error);
-      alert("Error generating PDF: " + (error.response?.data?.error || error.message));
-      setIsUpdating(false);
-    }
-  }, [selectedWeek, weekRange, token]);
-
-  const sendBulkWhatsApp = useCallback(async () => {
-    if (allDashboardData.length === 0) return alert("No data to send!");
-    if (!window.confirm(`Send WhatsApp report to ${allDashboardData.length} employees?`)) return;
-    setIsUpdating(true);
-    const PHONE_ID = process.env.REACT_APP_META_WA_PHONE_ID;
-    const TOKEN = process.env.REACT_APP_META_WA_TOKEN;
-    const isMonday = new Date().getDay() === 1;
-    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-    for (let i = 0; i < allDashboardData.length; i++) {
-      const emp = allDashboardData[i];
-      const empInfo = employees.find(e => e.name === emp.name);
-      const phone = empInfo?.number;
-      if (!phone) continue;
-
-      const cleanPhone = phone.toString().replace(/\D/g, "");
-      const finalPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-      const withoutDelData = calculateWithoutDelegation(emp);
-      const woOverall = Math.abs(withoutDelData.overallScore || 0);
-      const delOverall = Math.abs(calculateDelegationOverall(emp.delegation) || 0);
-      const isHighScorer = woOverall > 10 || delOverall > 10;
-      const var5 = isMonday ? (isHighScorer ? "⚠️ EM MEETING ALERT: Score > 10%" : "🌟 EXCELLENT") : "🚀 PERFORMANCE REMINDER";
-      const var6 = isMonday ? (isHighScorer ? "Prepared with reasons." : "Proud of you!") : "Maintain your score.";
-
-      try {
-        await axiosLib.post(`https://graph.facebook.com/v21.0/${PHONE_ID}/messages`, {
-          messaging_product: "whatsapp",
-          to: finalPhone,
-          type: "template",
-          template: {
-            name: "workreport",
-            language: { code: "en" },
-            components: [{ type: "body", parameters: [
-              { type: "text", text: String(emp.name) },
-              { type: "text", text: `${weekRange.start} to ${weekRange.end}` },
-              { type: "text", text: String(Math.round(delOverall * 100) / 100) },
-              { type: "text", text: String(Math.round(woOverall * 100) / 100) },
-              { type: "text", text: String(var5) },
-              { type: "text", text: String(var6) }
-            ]}]
-          }
-        }, { headers: { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' } });
-        await delay(2000);
-      } catch (err) {
-        console.error(`Error for ${emp.name}:`, err.response?.data || err.message);
+      if (sortBy === "deadline") {
+        dateA = parseDDMMYYYY(a.Deadline);
+        dateB = parseDDMMYYYY(b.Deadline);
+      } else if (sortBy === "createdDate") {
+        dateA = parseDDMMYYYY(a.CreatedDate);
+        dateB = parseDDMMYYYY(b.CreatedDate);
       }
+
+      // Handle null/undefined dates
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+
+      const comparison = dateA.getTime() - dateB.getTime();
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+
+    return sorted;
+  };
+
+  // ----------------------- Download Report
+  const downloadDelegationReport = () => {
+    if (!selectedEmp) {
+      toast.warn("Select employee first");
+      return;
     }
-    setIsUpdating(false);
-    alert("Bulk Process completed!");
-  }, [allDashboardData, employees, weekRange, calculateWithoutDelegation, calculateDelegationOverall]);
 
-  const downloadPDF = useCallback((filterType = "all") => {
-    if (!allDashboardData.length) return alert("Please wait, data is still loading!");
-    const doc = new jsPDF("landscape", "mm", "a4");
-    doc.setFillColor(255, 235, 156);
-    doc.rect(10, 10, 277, 8, "F");
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "bold");
-    doc.text(`WEEK NO.-0${selectedWeek} ( ${weekRange.start} TO ${weekRange.end} ) - ${filterType === 'em' ? 'EM ONLY' : 'ALL'}`, 148, 15.5, { align: "center" });
+    const filtered = tasks.filter(
+      t => t.Taskcompletedapproval !== "Approved"
+    );
 
-    const headers = [
-      [{ content: "DOER NO.", rowSpan: 2 }, { content: "DOER NAME", rowSpan: 2 }, { content: "WITHOUT DELEGATION", colSpan: 7 }, { content: "DELEGATION", colSpan: 7 }, { content: "OVERALL", colSpan: 7 }, { content: "EM DOER", rowSpan: 2 }],
-      ["TOTAL", "COMPLETED", "ON TIME", "PENDING", "PEND %", "DELAY %", "SCORE", "TOTAL", "COMPLETED", "ON TIME", "PENDING", "PEND %", "DELAY %", "SCORE", "TOTAL", "COMPLETED", "ON TIME", "PENDING", "PEND %", "DELAY %", "SCORE", ""]
-    ];
+    if (filtered.length === 0) {
+      toast.info("No tasks to download");
+      return;
+    }
 
-    const body = allDashboardData.map((emp, idx) => {
-      const withoutDelData = calculateWithoutDelegation(emp);
-      const delOverall = Math.abs(calculateDelegationOverall(emp.delegation) || 0);
-      const overall = emp.overall || {};
-      const woOverallNum = Math.abs(withoutDelData.overallScore || 0);
-      const isEMDoer = (woOverallNum > 10 || delOverall > 10) ? "YES" : "NO";
-      const del = emp.delegation || {};
-      return [
-        idx + 1, emp.name,
-        withoutDelData.totalWork, withoutDelData.completedWork, withoutDelData.onTimeWork, withoutDelData.pendingWork,
-        formatPercent(withoutDelData.pendingPercent), formatPercent(withoutDelData.delayPercent), formatPercent(withoutDelData.overallScore),
-        del.totalWork || 0, del.completedWork || 0, del.onTimeWork || 0, del.pendingWork || 0,
-        formatPercent(del.pendingPercent), formatPercent(del.delayPercent), formatPercent(delOverall),
-        overall.totalWork || 0, overall.totalCompleted || 0, overall.totalOnTime || 0, overall.totalPending || 0,
-        formatPercent(overall.pendingPercent), formatPercent(overall.delayPercent), formatPercent(overall.overallScore),
-        isEMDoer
-      ];
-    }).filter((row) => filterType !== "em" || row[row.length - 1] === "YES");
+    filtered.sort((a, b) => {
+      // 1️⃣ First sort by Name
+      const nameCompare = (a.Name || "").localeCompare(b.Name || "");
+      if (nameCompare !== 0) return nameCompare;
+
+      // 2️⃣ Then sort by Status for same Name
+      return (a.Status || "").localeCompare(b.Status || "");
+    });
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    doc.setFontSize(14);
+    doc.text(`Delegation Report (Pending & Completed) - ${selectedEmp}`, 14, 15);
 
     autoTable(doc, {
-      head: headers, body, startY: 18, theme: 'grid',
-      styles: { fontSize: 5, halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0] },
-      headStyles: { fillColor: [198, 224, 180], textColor: [0, 0, 0], fontStyle: 'bold' },
-      columnStyles: { 1: { cellWidth: 20 }, 7: { cellWidth: 8 }, 14: { cellWidth: 8 }, 21: { cellWidth: 8 }, 22: { cellWidth: 8 } }
+      head: [[
+        "Name",
+        "Task Name",
+        "Created Date",
+        "Deadline",
+        "Final Date",
+        "Revisions",
+        "Status"
+      ]],
+      body: filtered.map(t => [
+        t.Name || "",
+        t.TaskName || "",
+        t.CreatedDate || "--",
+        t.Deadline || "--",
+        t.FinalDate || "--",
+        t.Revisions || "--",
+        t.Status 
+      ]),
+      startY: 22,
+      theme: "grid",
+      styles: {
+        fontSize: 9,
+        cellPadding: 2,
+        overflow: "linebreak",
+      },
+      columnStyles: {
+        1: { cellWidth: 60 }, // Task Name column
+        0: { cellWidth: 20 }
+      },
     });
-    doc.save(`${filterType === "em" ? "EM_Report" : "Full_Report"}_W${selectedWeek}.pdf`);
-  }, [allDashboardData, selectedWeek, weekRange, calculateWithoutDelegation, calculateDelegationOverall, formatPercent]);
 
-  const employeeDataRendered = useMemo(() => {
-    return allDashboardData.map((emp, idx) => {
-      const withoutDelData = calculateWithoutDelegation(emp);
-      const delOverall = Math.abs(calculateDelegationOverall(emp.delegation) || 0);
-      const overallData = emp.overall || {};
-      const woOverallNum = Math.abs(withoutDelData.overallScore || 0);
-      const combinedOverall = ((woOverallNum + delOverall) / 2);
-      return { emp, idx, withoutDelData, delOverall, overallData, combinedOverall, woOverallNum };
+    doc.save(
+      `delegation_report_all_${selectedEmp}_${new Date()
+        .toISOString()
+        .slice(0, 10)}.pdf`
+    );
+
+    toast.success("Delegation report downloaded");
+    setShowDownloadDropdown(false);
+  };
+
+  const downloadDelegationReportCompleted = () => {
+    if (!selectedEmp) {
+      toast.warn("Select employee first");
+      return;
+    }
+
+    const filtered = tasks.filter(
+      t => t.Status === "Completed" && t.Taskcompletedapproval !== "Approved"
+    );
+
+    if (filtered.length === 0) {
+      toast.info("No completed tasks to download");
+      return;
+    }
+
+    filtered.sort((a, b) => {
+      // 1️⃣ First sort by Name
+      const nameCompare = (a.Name || "").localeCompare(b.Name || "");
+      if (nameCompare !== 0) return nameCompare;
+
+      // 2️⃣ Then sort by Status for same Name
+      return (a.Status || "").localeCompare(b.Status || "");
     });
-  }, [allDashboardData, calculateWithoutDelegation, calculateDelegationOverall]);
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    doc.setFontSize(14);
+    doc.text(`Completed Tasks Report - ${selectedEmp}`, 14, 15);
+
+    autoTable(doc, {
+      head: [[
+        "Name",
+        "Task Name",
+        "Created Date",
+        "Deadline",
+        "Final Date",
+        "Revisions",
+        "Status"
+      ]],
+      body: filtered.map(t => [
+        t.Name || "",
+        t.TaskName || "",
+        t.CreatedDate || "--",
+        t.Deadline || "--",
+        t.FinalDate || "--",
+        t.Revisions || "--",
+        t.Status 
+      ]),
+      startY: 22,
+      theme: "grid",
+      styles: {
+        fontSize: 9,
+        cellPadding: 2,
+        overflow: "linebreak",
+      },
+      columnStyles: {
+        1: { cellWidth: 60 }, // Task Name column
+        0: { cellWidth: 20 }
+      },
+    });
+
+    doc.save(
+      `delegation_report_completed_${selectedEmp}_${new Date()
+        .toISOString()
+        .slice(0, 10)}.pdf`
+    );
+
+    toast.success("Completed tasks report downloaded");
+    setShowDownloadDropdown(false);
+  };
+
+  const downloadDelegationReportPending = () => {
+    if (!selectedEmp) {
+      toast.warn("Select employee first");
+      return;
+    }
+
+    const filtered = tasks.filter(
+      t => t.Status !== "Completed" && t.Taskcompletedapproval !== "Approved"
+    );
+
+    if (filtered.length === 0) {
+      toast.info("No pending tasks to download");
+      return;
+    }
+
+    filtered.sort((a, b) => {
+      // 1️⃣ First sort by Name
+      const nameCompare = (a.Name || "").localeCompare(b.Name || "");
+      if (nameCompare !== 0) return nameCompare;
+
+      // 2️⃣ Then sort by Status for same Name
+      return (a.Status || "").localeCompare(b.Status || "");
+    });
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    doc.setFontSize(14);
+    doc.text(`Pending Tasks Report - ${selectedEmp}`, 14, 15);
+
+    autoTable(doc, {
+      head: [[
+        "Name",
+        "Task Name",
+        "Created Date",
+        "Deadline",
+        "Final Date",
+        "Revisions",
+        "Status"
+      ]],
+      body: filtered.map(t => [
+        t.Name || "",
+        t.TaskName || "",
+        t.CreatedDate || "--",
+        t.Deadline || "--",
+        t.FinalDate || "--",
+        t.Revisions || "--",
+        t.Status 
+      ]),
+      startY: 22,
+      theme: "grid",
+      styles: {
+        fontSize: 9,
+        cellPadding: 2,
+        overflow: "linebreak",
+      },
+      columnStyles: {
+        1: { cellWidth: 60 }, // Task Name column
+        0: { cellWidth: 20 }
+      },
+    });
+
+    doc.save(
+      `delegation_report_pending_${selectedEmp}_${new Date()
+        .toISOString()
+        .slice(0, 10)}.pdf`
+    );
+
+    toast.success("Pending tasks report downloaded");
+    setShowDownloadDropdown(false);
+  };
+
+  // ✅ NEW: Download 3 Week Above Report
+  const downloadDelegationReportThreeWeekAbove = () => {
+    if (!selectedEmp) {
+      toast.warn("Select employee first");
+      return;
+    }
+
+    const filtered = tasks.filter(
+      t => isThreeWeekAbove(t.Deadline) && 
+           t.Status !== "Completed" && 
+           t.Taskcompletedapproval !== "Approved"
+    );
+
+    if (filtered.length === 0) {
+      toast.info("No 3 week above tasks to download");
+      return;
+    }
+
+    filtered.sort((a, b) => {
+      const nameCompare = (a.Name || "").localeCompare(b.Name || "");
+      if (nameCompare !== 0) return nameCompare;
+      return (a.Status || "").localeCompare(b.Status || "");
+    });
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    doc.setFontSize(14);
+    doc.text(`3 Week Above Tasks Report - ${selectedEmp}`, 14, 15);
+
+    autoTable(doc, {
+      head: [[
+        "Name",
+        "Task Name",
+        "Created Date",
+        "Deadline",
+        "Final Date",
+        "Revisions",
+        "Status"
+      ]],
+      body: filtered.map(t => [
+        t.Name || "",
+        t.TaskName || "",
+        t.CreatedDate || "--",
+        t.Deadline || "--",
+        t.FinalDate || "--",
+        t.Revisions || "--",
+        t.Status 
+      ]),
+      startY: 22,
+      theme: "grid",
+      styles: {
+        fontSize: 9,
+        cellPadding: 2,
+        overflow: "linebreak",
+      },
+      columnStyles: {
+        1: { cellWidth: 60 },
+        0: { cellWidth: 20 }
+      },
+    });
+
+    doc.save(
+      `delegation_report_3weekabove_${selectedEmp}_${new Date()
+        .toISOString()
+        .slice(0, 10)}.pdf`
+    );
+
+    toast.success("3 Week Above report downloaded");
+    setShowDownloadDropdown(false);
+  };
+
+  const sendPendingDelegationWhatsApp = async () => {
+    if (!selectedEmp) {
+      toast.warn("Select employee first");
+      return;
+    }
+
+    try {
+      const pending = tasks.filter(t => 
+        isTodayOrPast(t.Deadline) && 
+        t.Status !== "Completed"
+      );
+
+      if (pending.length === 0) {
+        toast.info("No pending delegation tasks");
+        return;
+      }
+
+      const sendWA = async (empName, empNumber, empTasks) => {
+        if (!empNumber || empTasks.length === 0) return;
+
+        const payload = {
+          number: `91${empNumber}`,
+          employeeName: empName,
+          delegations: empTasks.map(t => t.TaskName)
+        };
+
+        console.log("WA Payload 👉", payload);
+
+        await axios.post(
+          "/whatsapp/send-delegation",
+          payload,
+          {
+            headers: { Authorization: `Bearer ${user.token}` }
+          }
+        );
+      };
+
+      if (selectedEmp === "all") {
+        const map = {};
+
+        pending.forEach(t => {
+          if (!t.Name) return;
+          if (!map[t.Name]) map[t.Name] = [];
+          map[t.Name].push(t);
+        });
+
+        await Promise.all(
+          Object.keys(map).map(name => {
+            const emp = employees.find(e => e.name === name);
+            if (!emp?.number) return;
+            return sendWA(name, emp.number, map[name]);
+          })
+        );
+
+        toast.success("All employees ko delegation WhatsApp bhej diya 🚀");
+        return;
+      }
+
+      const empTasks = pending.filter(t => t.Name === selectedEmp);
+      if (empTasks.length === 0) {
+        toast.info("No pending tasks");
+        return;
+      }
+
+      const emp = employees.find(e => e.name === selectedEmp);
+      if (!emp?.number) {
+        toast.warn("Employee WhatsApp number missing");
+        return;
+      }
+
+      await sendWA(selectedEmp, emp.number, empTasks);
+      toast.success("Delegation WhatsApp sent ✅");
+
+    } catch (err) {
+      console.error(err);
+      toast.error("WhatsApp send failed ❌");
+    }
+  };
+
+  const delegationFlowup = async () => {
+    try {
+      if (!selectedEmp) {
+        toast.warn("Select employee first");
+        return;
+      }
+
+      const pending = tasks.filter(t => 
+        isTodayOrPast(t.Deadline) && 
+        t.Status !== "Completed" &&
+        t.Name === selectedEmp
+      );
+
+      if (pending.length === 0) {
+        toast.info("No pending tasks");
+        return;
+      }
+
+      const emp = employees.find(e => e.name === selectedEmp);
+      if (!emp?.number) {
+        toast.warn("Employee WhatsApp number missing");
+        return;
+      }
+
+      const taskList = pending
+        .map((t, i) => `${i + 1}. ${t.TaskName}`)
+        .join("\n");
+
+      const message = encodeURIComponent(
+`Hi ${selectedEmp},
+
+👉 This is a gentle reminder regarding today's pending & overdue tasks.
+Kindly complete the tasks/shift the dates accordingly. ⏳📅
+
+${taskList}
+
+Thanks`
+      );
+
+      const whatsappWindow = window.open(
+        `https://wa.me/${emp.number}?text=${message}`,
+        "_blank"
+      );
+
+      if (!whatsappWindow) {
+        toast.error("Popup blocked. Allow popups for this site.");
+        return;
+      }
+
+      toast.success("WhatsApp opened successfully ✅");
+
+    } catch (error) {
+      console.error(error);
+      toast.error("WhatsApp send failed ❌");
+    }
+  };
+
+  const normalizeDate = (date) => {
+    if (!date) return "";
+    const d = new Date(date || Date.now());
+    if (isNaN(d)) return "";
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${dd}/${mm}/${yyyy}`;
+  };
+
+  // ✅ NEW: Go to top function
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  };
+
+  // -----------------------
+  const loadEmployees = async () => {
+    try {
+      const res = await axios.get("/employee/all", {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      setEmployees(res.data || []);
+    } catch (err) {
+      console.error("Failed to load employees", err);
+      toast.error("Failed to load employees");
+    }
+  };
+  
+  const loadAdmin = async () => {
+    try {
+      const res = await axios.get("/employee/allAdmin", {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      setAdmin(res.data || []);
+    } catch (err) {
+      console.error("Failed to load Admin", err);
+      toast.error("Failed to load Admin");
+    }
+  };
+
+  const loadUserTasks = async (name, assignByValue) => {
+    if (!name) return;
+    setLoading(true);
+    try {
+      let url = `/delegations/search/by-name?name=${encodeURIComponent(name)}`;
+
+      if (assignByValue && assignByValue !== "all") {
+        url += `&assignBy=${encodeURIComponent(assignByValue)}`;
+      }
+
+      const res = await axios.get(url, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+
+      const formattedTasks = res.data.map((t) => ({
+        ...t,
+        CreatedDate: t.CreatedDate,
+        Deadline: t.Deadline,
+        FinalDate: t.FinalDate,
+      }));
+
+      setTasks(formattedTasks);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load tasks");
+      setTasks([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      loadEmployees();
+      loadAdmin();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (selectedEmp) {
+      loadUserTasks(selectedEmp, assignBy);
+    }
+  }, [selectedEmp, assignBy]);
+
+  const createTask = async () => {
+    if (!selectedEmp) {
+      toast.warn("Select employee first");
+      return;
+    }
+    if (!form.TaskName || !form.Deadline) {
+      toast.warn("Task Name & Deadline required");
+      return;
+    }
+
+    setLoadingTaskId("create");
+    try {
+      const payload = {
+        TaskName: form.TaskName,
+        Deadline: normalizeDate(form.Deadline),
+        Name: selectedEmp,
+        AssignBy: assignBy
+      };
+      const res = await axios.post("/delegations/", payload, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      console.log("tsting: ", res);
+      if (res.data.ok === true) {
+        loadUserTasks();
+        setTasks([
+          {
+            TaskID: res.data.TaskID,
+            Name: selectedEmp,
+            TaskName: form.TaskName,
+            Deadline: normalizeDate(form.Deadline),
+            CreatedDate: formatDateDDMMYYYYHHMMSS(),
+            Revision1: "",
+            Revision2: "",
+            FinalDate: "",
+            Revisions: 0,
+            Priority: form.Priority,
+            Status: "Pending",
+            AssignBy: assignBy,
+            Taskcompletedapproval: "Pending",
+          },
+          ...tasks,
+        ]);
+
+        setForm({ TaskName: "", Deadline: "", Priority: "", Notes: "" });
+        setShowCreate(false);
+        toast.success("Task created successfully");
+      } else {
+        toast.error("Failed to create task Technical Issue Please Re Create");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || "Failed to create task");
+    } finally {
+      setLoadingTaskId(null);
+    }
+  };
+
+  // -----------------------
+  const handleDone = async (taskID) => {
+    setLoadingTaskId(taskID);
+    try {
+      await axios.patch(`/delegations/done/${taskID}`, null, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      setTasks(
+        tasks.map((t) =>
+          t.TaskID === taskID
+            ? { ...t, Status: "Completed", FinalDate: formatDateDDMMYYYYHHMMSS() }
+            : t
+        )
+      );
+      toast.success("Task marked as done");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to mark task as done");
+    } finally {
+      setLoadingTaskId(null);
+    }
+  };
+
+  const openShiftPicker = (task) => {
+    setShiftTask(task);
+    setShiftDate("");
+    setForm({ ...form, Deadline: task.Deadline });
+  };
+
+  const confirmShift = async () => {
+    if (!form.Deadline) {
+      toast.warn("Select new deadline");
+      return;
+    }
+    setLoadingShiftBtn(true);
+    const revisionField = shiftTask.Revisions === 0 ? "Revision1" : "Revision2";
+
+    try {
+      await axios.patch(
+        `/delegations/shift/${shiftTask.TaskID}`,
+        { newDeadline: normalizeDate(form.Deadline), revisionField },
+        { headers: { Authorization: `Bearer ${user.token}` } }
+      );
+
+      setTasks(
+        tasks.map((t) =>
+          t.TaskID === shiftTask.TaskID
+            ? {
+                ...t,
+                [revisionField]: normalizeDate(form.Deadline),
+                Deadline: normalizeDate(form.Deadline),
+                Revisions: t.Revisions + 1,
+                Status: "Shifted",
+              }
+            : t
+        )
+      );
+
+      setShiftTask(null);
+      setForm({ ...form, Deadline: "" });
+      toast.success("Task deadline shifted");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to shift deadline");
+    } finally {
+      setLoadingShiftBtn(false);
+    }
+  };
+
+  const handleApprovalChange = async (taskID, value) => {
+    setLoadingApprovalId(taskID);
+    try {
+      await axios.patch(
+        `/delegations/approve/${taskID}`,
+        { approvalStatus: value },
+        { headers: { Authorization: `Bearer ${user.token}` } }
+      );
+      setTasks(
+        tasks.map((t) => {
+          if (value === "Pending") {
+            return t.TaskID === taskID
+              ? { ...t, FinalDate: "", Status: "Pending", Taskcompletedapproval: value }
+              : t;
+          } else {
+            return t.TaskID === taskID ? { ...t, Taskcompletedapproval: value } : t;
+          }
+        })
+      );
+      toast.success("Approval status updated");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update approval");
+    } finally {
+      setLoadingApprovalId(null);
+    }
+  };
+  
+  const editTaskDetails = (task) => {
+    setEditTask(task);
+    setForm({
+      TaskName: task.TaskName,
+      Deadline: task.Deadline,
+      Priority: task.Priority,
+      Notes: task.Followup,
+    });
+  };
+  
+  const updateTask = async () => {
+    if (!form.TaskName) {
+      toast.warn("Task Name is required");
+      return;
+    }
+
+    setLoadingTaskId("update");
+    try {
+      const payload = {
+        TaskName: form.TaskName,
+      };
+
+      await axios.put(`/delegations/update/${editTask.TaskID}`, payload, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+
+      setTasks(
+        tasks.map((t) =>
+          t.TaskID === editTask.TaskID
+            ? { ...t, TaskName: form.TaskName }
+            : t
+        )
+      );
+
+      setEditTask(null);
+      setForm({ TaskName: "", Deadline: "", Priority: "", Notes: "" });
+      toast.success("Task updated successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update task");
+    } finally {
+      setLoadingTaskId(null);
+    }
+  };
+
+  const deleteTask = async (taskID) => {
+    setLoadingTaskId(taskID);
+    try {
+      await axios.delete(`/delegations/delete/${taskID}`, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      setTasks(tasks.filter((t) => t.TaskID !== taskID));
+      toast.success("Task deleted successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete task");
+    } finally {
+      setLoadingTaskId(null);
+      setDeleteTaskId(null);
+    }
+  };
+
+  // -----------------------
+  const sortedTasks = [...tasks].sort((a, b) => {
+    const nameA = (a.Name || "").toLowerCase();
+    const nameB = (b.Name || "").toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+
+  // ✅ MAIN FILTER - UPDATED with threeWeekAbove tab
+  const today = getTodayStart();
+
+  let filteredTasks = sortedTasks.filter((t) => {
+    if (activeTab === "pending") {
+      return (
+        t.Status !== "Completed" &&
+        (!t.Taskcompletedapproval ||
+          t.Taskcompletedapproval === "Pending" ||
+          t.Taskcompletedapproval === "NotApproved")
+      );
+    } 
+    else if (activeTab === "completed") {
+      return (
+        t.Status === "Completed" &&
+        (!t.Taskcompletedapproval ||
+          t.Taskcompletedapproval === "Pending" ||
+          t.Taskcompletedapproval === "NotApproved")
+      );
+    } 
+    else if (activeTab === "approved") {
+      return (
+        t.Status === "Completed" &&
+        t.Taskcompletedapproval === "Approved"
+      );
+    } 
+    else if (activeTab === "Today_Followup") {
+      const deadlineDate = parseDDMMYYYY(t.Deadline);
+      if (!deadlineDate) return false;
+
+      const deadlineOnlyDate = new Date(
+        deadlineDate.getFullYear(),
+        deadlineDate.getMonth(),
+        deadlineDate.getDate()
+      );
+
+      return (
+        deadlineOnlyDate <= today &&
+        t.Status !== "Completed"
+      );
+    }
+    // ✅ NEW: Three Week Above Tab
+    else if (activeTab === "threeWeekAbove") {
+      return (
+        isThreeWeekAbove(t.Deadline) &&
+        t.Status !== "Completed" &&
+        (!t.Taskcompletedapproval ||
+          t.Taskcompletedapproval === "Pending" ||
+          t.Taskcompletedapproval === "NotApproved")
+      );
+    }
+
+    return false;
+  });
+
+  // ✅ NEW: Apply sorting to filtered tasks
+  filteredTasks = sortTasks(filteredTasks);
+
+  // ✅ NEW: Toggle sort function
+  const toggleSort = (type) => {
+    if (sortBy === type) {
+      // Toggle order
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      // Set new sort
+      setSortBy(type);
+      setSortOrder("asc");
+    }
+  };
 
   return (
-    <div className="h-screen flex flex-col bg-slate-100 font-sans">
-      <header className="sticky top-0 z-40 bg-slate-800 text-white px-4 py-3 md:px-6 shadow-md">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex flex-col">
-            <h1 className="font-black uppercase text-base md:text-lg leading-tight tracking-wider">Management Dashboard</h1>
-            <p className="text-[10px] md:text-xs text-blue-400 font-bold">{weekRange.start || "Loading..."} — {weekRange.end || "Loading..."}</p>
-          </div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
-            <div className="grid grid-cols-2 sm:flex items-center bg-slate-900 rounded-xl p-2 gap-2 w-full sm:w-auto border border-slate-700">
-              <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer p-1">
-                <option value="all" className="text-black font-bold">All Employees</option>
-                {employees.map((emp) => <option key={emp.key || emp.name} value={emp.key || emp.name} className="text-black">{emp.name}</option>)}
-              </select>
-              <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))} className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer p-1">
-                {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1} className="text-black">{new Date(0, i).toLocaleString("default", { month: "long" })}</option>)}
-              </select>
-              <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value === "all" ? "all" : Number(e.target.value))} className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer p-1 sm:border-l sm:border-slate-700 sm:pl-2">
-                <option value="all" className="text-black">All Weeks</option>
-                {[1, 2, 3, 4, 5].map((w) => <option key={w} value={w} className="text-black">Week {w}</option>)}
-              </select>
-            </div>
-            {selectedEmployee === "all" && (
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                <button onClick={() => downloadPDF("all")} disabled={loading} className={`flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg transition-all active:scale-95 ${loading ? 'bg-slate-600' : 'bg-blue-600 hover:bg-blue-700'}`}>ALL REPORT</button>
-                <button onClick={() => downloadPDF("em")} disabled={loading} className={`flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg transition-all active:scale-95 ${loading ? 'bg-slate-600' : 'bg-rose-600 hover:bg-rose-700'}`}>EM REPORT</button>
-                <button onClick={sendBulkWhatsApp} disabled={true} className="flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg bg-slate-600">WHATSAPP</button>
-                
-                {isEminentAdmin && (
-                  <button 
-                    onClick={loadEMSheetData}
-                    disabled={loading || emSheetLoading} 
-                    className={`flex-1 sm:flex-none text-white text-[9px] font-black px-4 py-2 rounded shadow-lg transition-all active:scale-95 ${
-                      loading || emSheetLoading ? 'bg-slate-600' : 'bg-emerald-600 hover:bg-emerald-700 animate-pulse'
-                    }`}
-                  >
-                    {emSheetLoading ? '⏳ Loading...' : '📊 EM Sheet Ritesh Sir'}
-                  </button>
-                )}
+    <div className="p-4 max-w-4xl mx-auto" ref={topRef}>
+      {/* ✅ NEW: Floating Go to Top Button */}
+      {selectedEmp && showGoToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 z-50 flex items-center justify-center"
+          style={{
+            width: "56px",
+            height: "56px",
+          }}
+          title="Go to Top"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      )}
+
+      {/* Employee Select */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {/* Select Employee */}
+        <div>
+          <label className="block mb-1 text-sm font-medium text-gray-700">
+            Select Employee
+          </label>
+          <select
+            className="w-full h-11 rounded-md border border-gray-300 bg-white px-3 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
+                       hover:border-gray-400 transition"
+            value={selectedEmp}
+            onChange={(e) => setSelectedEmp(e.target.value)}
+          >
+            <option value="">-- Select Employee --</option>
+            <option value="all">All Delegation</option>
+            {employees
+              .sort((a, b) =>
+                a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+              )
+              .map((emp) => (
+                <option key={emp.name} value={emp.name}>
+                  {emp.name}
+                </option>
+              ))}
+          </select>
+        </div>
+
+        {/* Assign By */}
+        <div>
+          <label className="block mb-1 text-sm font-medium text-gray-700">
+            Assign By
+          </label>
+          <select
+            className="w-full rounded-md border border-gray-300 bg-white
+                       px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-emerald-500
+                       hover:border-gray-400 transition"
+            value={assignBy}
+            onChange={(e) => setAssignBy(e.target.value)}
+          >
+            <option value="" disabled hidden>
+              -- Select Assign By --
+            </option>
+
+            {admin
+              .filter(emp => typeof emp?.name === "string" && emp.name.trim() !== "")
+              .sort((a, b) =>
+                a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+              )
+              .map((emp) => (
+                <option key={emp.name} value={emp.name}>
+                  {emp.name}
+                </option>
+              ))}
+
+            <option value="all">All Assign</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Create Task And Download Buttons */}
+      {selectedEmp && (
+        <div className="mb-6 flex gap-3 flex-wrap">
+          <button
+            className="bg-blue-600 text-white px-4 py-2 rounded"
+            onClick={() => setShowCreate(!showCreate)}
+          >
+            {showCreate ? "Cancel" : "Create Task"}
+          </button>
+
+          {/* Download Dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              className="bg-gray-700 text-white px-4 py-2 rounded flex items-center gap-2"
+              onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+            >
+              Download Reports
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {showDownloadDropdown && (
+              <div className="absolute left-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 border">
+                <button
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  onClick={downloadDelegationReport}
+                >
+                  📄 All Tasks (Pending & Completed)
+                </button>
+                <button
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  onClick={downloadDelegationReportPending}
+                >
+                  ⏳ Only Pending Tasks
+                </button>
+                <button
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  onClick={downloadDelegationReportCompleted}
+                >
+                  ✅ Only Completed Tasks
+                </button>
+                {/* ✅ NEW: 3 Week Above Download button */}
+                <button
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t"
+                  onClick={downloadDelegationReportThreeWeekAbove}
+                >
+                  📅 3 Week Above Tasks
+                </button>
               </div>
             )}
           </div>
+
+          <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={delegationFlowup}>
+            Pending Delegation Whatsapp Flowup
+          </button>
+
+          {/* ✅ NEW: Go to Top button */}
+          {/* <button
+            onClick={scrollToTop}
+            className="bg-indigo-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-indigo-700 transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+            </svg>
+            Go to Top
+          </button> */}
         </div>
-      </header>
+      )}
 
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 relative">
-        {(loading || isUpdating) && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100/80 backdrop-blur-sm z-50">
-            <div className="relative">
-              <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-600 font-bold text-[10px]">{isUpdating ? "PDF" : "DATA"}</div>
-            </div>
-            <p className="mt-4 text-slate-600 font-black text-xs animate-pulse uppercase tracking-widest">{isUpdating ? "Generating PDF..." : "Fetching Dashboard..."}</p>
+      {/* Create Task Form */}
+      {showCreate && (
+        <div className="bg-white p-4 rounded shadow border mb-6">
+          <label htmlFor="taskName" className="block text-sm font-semibold mb-2">
+            Task Name
+          </label>
+          <input
+            type="text"
+            placeholder="Task Name"
+            className="w-full border p-2 rounded mb-2"
+            value={form.TaskName}
+            onChange={(e) => setForm({ ...form, TaskName: e.target.value })}
+          />
+          <label htmlFor="planDate" className="block text-sm font-semibold mb-2">
+            Plan Date
+          </label>
+          <input
+            type="date"
+            className="w-full border p-2 rounded mb-2"
+            value={form.Deadline}
+            onChange={(e) => setForm({ ...form, Deadline: e.target.value })}
+          />
+
+          <button
+            className="bg-green-600 text-white px-4 py-2 rounded"
+            onClick={createTask}
+            disabled={loadingTaskId === "create"}
+          >
+            {loadingTaskId === "create" ? "Creating..." : "Save Task"}
+          </button>
+        </div>
+      )}
+
+      {/* Loading */}
+      {loading && selectedEmp && (
+        <div className="text-center text-lg p-6">Loading tasks...</div>
+      )}
+
+      {!selectedEmp && (
+        <div className="text-center text-gray-500 mt-10">
+          Please select an employee to view delegation tasks.
+        </div>
+      )}
+
+      {!loading && selectedEmp && (
+        <>
+          {/* Tabs - Updated with 3 Week Above */}
+          <div className="flex gap-3 mb-6 flex-wrap">
+            <button
+              className={`px-3 py-2 rounded ${
+                activeTab === "pending" ? "bg-blue-600 text-white" : "bg-gray-300"
+              }`}
+              onClick={() => setActiveTab("pending")}
+            >
+              Pending / Shifted
+            </button>
+            <button
+              className={`px-3 py-2 rounded ${
+                activeTab === "Today_Followup" ? "bg-purple-600 text-white" : "bg-gray-300"
+              }`}
+              onClick={() => setActiveTab("Today_Followup")}
+            >
+              Today Followup
+            </button>
+            <button
+              className={`px-3 py-2 rounded ${
+                activeTab === "threeWeekAbove" ? "bg-red-600 text-white" : "bg-gray-300"
+              }`}
+              onClick={() => setActiveTab("threeWeekAbove")}
+            >
+              ⚠️ 3 Week Above
+            </button>
+            <button
+              className={`px-3 py-2 rounded ${
+                activeTab === "completed" ? "bg-green-600 text-white" : "bg-gray-300"
+              }`}
+              onClick={() => setActiveTab("completed")}
+            >
+              Completed
+            </button>
+            <button
+              className={`px-3 py-2 rounded ${
+                activeTab === "approved" ? "bg-purple-600 text-white" : "bg-gray-300"
+              }`}
+              onClick={() => setActiveTab("approved")}
+            >
+              Approved
+            </button>
           </div>
-        )}
 
-        {!loading && (
-          <div className="animate-fadeIn">
-            {selectedEmployee === "all" ? (
-              <div className="space-y-6">
-                {employeeDataRendered.map(({ emp, idx, withoutDelData, delOverall, overallData, combinedOverall }) => (
-                  <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl hover:border-blue-300 transition-all duration-300 group">
-                    <div className="px-6 py-4 border-b bg-gradient-to-r from-slate-50 to-blue-50 group-hover:from-blue-50 group-hover:to-indigo-50 transition-colors">
-                      <div className="flex justify-between items-center">
-                        <h2 className="font-black uppercase text-lg text-slate-700 group-hover:text-blue-700">{emp.name}</h2>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-100 text-blue-700">Employee #{idx + 1}</span>
-                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${combinedOverall > 10 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{combinedOverall > 10 ? '⚠️ EM Required' : '✅ Good'}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 cursor-default">
-                      <SectionBlock title="Delegation" data={emp.delegation} score={formatPercent(delOverall)} formatPercent={formatPercent} theme="slate" />
-                      <SectionBlock title="Without Delegation" data={withoutDelData} formatPercent={formatPercent} theme="blue" score={formatPercent(withoutDelData.overallScore)} />
-                      <SectionBlock title="Overall" data={overallData} formatPercent={formatPercent} theme="emerald" score={formatPercent(overallData.overallScore)} />
-                    </div>
-                  </div>
-                ))}
+          {/* ✅ NEW: Sort Buttons */}
+          <div className="flex gap-3 mb-4 flex-wrap items-center">
+            <span className="text-sm font-medium text-gray-700 mr-2">Sort by:</span>
+            
+            <button
+              onClick={() => toggleSort("deadline")}
+              className={`px-3 py-1.5 rounded text-sm flex items-center gap-1 transition ${
+                sortBy === "deadline" 
+                  ? "bg-blue-600 text-white" 
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              📅 Deadline
+              {sortBy === "deadline" && (
+                <span className="ml-1">
+                  {sortOrder === "asc" ? "↑" : "↓"}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => toggleSort("createdDate")}
+              className={`px-3 py-1.5 rounded text-sm flex items-center gap-1 transition ${
+                sortBy === "createdDate" 
+                  ? "bg-green-600 text-white" 
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              📝 Created Date
+              {sortBy === "createdDate" && (
+                <span className="ml-1">
+                  {sortOrder === "asc" ? "↑" : "↓"}
+                </span>
+              )}
+            </button>
+
+            {sortBy && (
+              <button
+                onClick={() => {
+                  setSortBy("");
+                  setSortOrder("asc");
+                }}
+                className="px-3 py-1.5 rounded text-sm bg-red-500 text-white hover:bg-red-600 transition"
+              >
+                ✕ Clear Sort
+              </button>
+            )}
+          </div>
+
+          {/* Task List */}
+          <div className="grid gap-4 max-h-[500px] overflow-y-auto">
+            {filteredTasks.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">
+                {activeTab === "threeWeekAbove" 
+                  ? "No tasks that are 3 weeks overdue 🎉" 
+                  : "No tasks found"}
               </div>
             ) : (
-              <div className="space-y-6 animate-fadeIn">
-                <SingleSection title="Delegation" data={allDashboardData[0]?.delegation} showScore={true} formatPercent={formatPercent} />
-                <SingleSection title="Checklist" data={allDashboardData[0]?.checklist} formatPercent={formatPercent} />
-                <SingleSection title="Help Tickets Assigned" data={allDashboardData[0]?.helpTicket?.assigned} formatPercent={formatPercent} />
-                <SingleSection title="Help Tickets Created" data={allDashboardData[0]?.helpTicket?.created} formatPercent={formatPercent} />
-                <SingleSection title="Support Tickets Assigned" data={allDashboardData[0]?.supportTicket?.assigned} formatPercent={formatPercent} />
-                <SingleSection title="Support Tickets Created" data={allDashboardData[0]?.supportTicket?.created} formatPercent={formatPercent} />
-                <SingleSection title="Overall" data={allDashboardData[0]?.overall} showScore={true} formatPercent={formatPercent} />
-              </div>
-            )}
+              filteredTasks.map((task) => (
+                <div 
+                  key={task.TaskID} 
+                  className={`p-4 bg-white rounded shadow border ${
+                    activeTab === "threeWeekAbove" ? "border-red-500 border-2" : ""
+                  }`}
+                >
+                  <div className="flex justify-between">
+                    <div>
+                      <div className="font-semibold text-lg">{task.TaskName}</div>
+                      <div className="text-sm text-gray-600">
+                        Created: {task.CreatedDate || "—"}, <span/><span/>
+                        Deadline: {task.Deadline || "—"}, <span />
+                        Completed: {task.FinalDate || "—"}, <span />
+                        Revision: {task.Revisions || "0"},<span/><span/>
+                        Name: {task.Name || "_"}
+                      </div>
+                      {activeTab === "threeWeekAbove" && (
+                        <div className="text-sm text-red-600 font-semibold mt-1">
+                          ⚠️ Overdue by 3+ weeks
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      className={`px-2 py-1 rounded text-sm ${
+                        task.Status === "Completed"
+                          ? "bg-green-100 text-green-700"
+                          : task.Status === "Shifted"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      {task.Status}
+                    </span>
+                  </div>
 
-            {allDashboardData.length === 0 && !loading && (
-              <div className="text-center py-20 bg-white rounded-3xl shadow-inner border-2 border-dashed border-slate-300">
-                <p className="text-slate-400 font-bold uppercase tracking-widest">No Data Found</p>
-              </div>
+                  <div className="mt-3 flex gap-3">
+                    <button
+                      onClick={() => editTaskDetails(task)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded"
+                    >
+                      Edit
+                    </button>
+                  </div>
+
+                  {activeTab === "completed" && task.Status === "Completed" && (
+                    <div className="mt-3">
+                      <label className="text-sm font-medium mr-2">Approval:</label>
+                      <select
+                        className="border p-1 rounded"
+                        value={task.Taskcompletedapproval==="Pending"?"":task.Taskcompletedapproval || ""}
+                        onChange={(e) =>
+                          handleApprovalChange(task.TaskID, e.target.value)
+                        }
+                        disabled={loadingApprovalId === task.TaskID}
+                      >
+                        <option value="">Select</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Pending">Pending</option>
+                      </select>
+                      {loadingApprovalId === task.TaskID ? "Processing..." : ""}
+                    </div>
+                  )}
+                </div>
+              ))
             )}
           </div>
-        )}
-      </main>
+        </>
+      )}
+      
+      {editTask && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow w-full max-w-md">
+            <h2 className="text-lg font-semibold mb-4">Edit Task Name</h2>
 
-      <EMSheetModal
-        isOpen={emSheetModalOpen}
-        onClose={() => setEmSheetModalOpen(false)}
-        data={emSheetData.employees}
-        weekInfo={emSheetData.weekInfo}
-        footer={emSheetData.footer}
-        onDownloadEM={() => downloadEMSheetPDF("em")}
-        onDownloadAll={() => downloadEMSheetPDF("all")}
-        loading={isUpdating}
-      />
+            <label className="block text-sm font-semibold mb-2">
+              Task Name
+            </label>
+            <input
+              type="text"
+              className="w-full border p-2 rounded mb-4"
+              value={form.TaskName}
+              onChange={(e) =>
+                setForm({ ...form, TaskName: e.target.value })
+              }
+            />
 
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn { animation: fadeIn 0.4s ease-out forwards; }
-      `}</style>
-    </div>
-  );
-}
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 bg-gray-400 text-white rounded"
+                onClick={() => setEditTask(null)}
+              >
+                Cancel
+              </button>
 
-// ============================================================
-// MEMOIZED SECTION BLOCK
-// ============================================================
-const SectionBlock = React.memo(({ title, data, score, formatPercent, theme }) => {
-  const baseTheme = theme === "blue" ? "from-blue-50" : theme === "emerald" ? "from-emerald-50" : "from-slate-50";
-  return (
-    <div className={`border border-slate-200 rounded-xl p-5 bg-gradient-to-br ${baseTheme} to-white hover:shadow-md transition-all duration-300 hover:border-blue-300`}>
-      <h3 className="font-black text-sm uppercase text-center mb-4 text-slate-600 border-b pb-3">{title}</h3>
-      <div className="grid grid-cols-2 gap-3">
-        <MiniCard title="Total Work" value={data?.totalWork || 0} theme="slate" />
-        <MiniCard title="Completed" value={data?.completedWork || data?.totalCompleted || 0} theme="emerald" />
-        <MiniCard title="On Time" value={data?.onTimeWork || data?.totalOnTime || 0} theme="emerald" />
-        <MiniCard title="Pending" value={data?.pendingWork || data?.totalPending || 0} theme="amber" />
-        <MiniCard title="Pending %" value={formatPercent(data?.pendingPercent)} theme="indigo" />
-        <MiniCard title="Delay %" value={formatPercent(data?.delayPercent)} theme="rose" />
-      </div>
-      {score !== undefined && (
-        <div className="mt-5 pt-4 border-t border-slate-200">
-          <div className="text-center">
-            <span className="text-xs font-bold text-slate-500">{title} Score</span>
-            <p className="text-xl font-black text-blue-600">{score}</p>
+              <button
+                className="px-4 py-2 bg-green-600 text-white rounded"
+                onClick={updateTask}
+                disabled={loadingTaskId === "update"}
+              >
+                {loadingTaskId === "update" ? "Updating..." : "Update"}
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Toast Container */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
     </div>
   );
-});
+}

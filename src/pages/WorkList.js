@@ -50,6 +50,9 @@ export default function AdminWorkList() {
   const [aiSheetData, setAISheetData] = useState([]);
   const [loadingAISheet, setLoadingAISheet] = useState(false);
 
+  // New state for worklist sorting
+  const [worklistSortOrder, setWorklistSortOrder] = useState("top"); // "top" | "bottom"
+
   const bulkModalRef = useRef();
   const addModalRef = useRef();
   const aiModalRef = useRef();
@@ -321,8 +324,32 @@ export default function AdminWorkList() {
     else return list.sort((a,b)=>a.occupancyPercentage-b.occupancyPercentage);
   };
 
+  // Helper function to sort worklists by WorkingTime
+  const getSortedWorklists = () => {
+    if (!worklists.length) return [];
+    const sorted = [...worklists];
+    return sorted.sort((a, b) => {
+      // Extract numeric value from WorkingTime (e.g., "60M" -> 60)
+      const getTimeValue = (timeStr) => {
+        if (!timeStr) return 0;
+        const num = parseInt(timeStr);
+        return isNaN(num) ? 0 : num;
+      };
+      
+      const timeA = getTimeValue(a.WorkingTime);
+      const timeB = getTimeValue(b.WorkingTime);
+      
+      if (worklistSortOrder === "top") {
+        return timeB - timeA; // Highest first (descending)
+      } else {
+        return timeA - timeB; // Lowest first (ascending)
+      }
+    });
+  };
+
   const totalPages = Math.ceil(worklists.length/PAGE_SIZE);
-  const paginatedData = worklists.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);
+  const sortedWorklists = getSortedWorklists();
+  const paginatedData = sortedWorklists.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);
 
   // ========== RENDER ==========
   return (
@@ -382,6 +409,13 @@ export default function AdminWorkList() {
             </select>
             <input type="text" placeholder="🔍 Search worklist..." value={search} onChange={(e)=>{setSearch(e.target.value);setPage(1);}} className="border rounded-lg px-3 py-2 text-sm flex-1" />
             {selectedEmp!=="all" && <button onClick={()=>handleDownload("employee")} className="bg-slate-700 text-white px-4 py-2 rounded-lg text-sm">📥 Download {selectedEmp}</button>}
+            {/* Sorting Button for Worklist */}
+            <button 
+              onClick={() => setWorklistSortOrder(worklistSortOrder === "top" ? "bottom" : "top")} 
+              className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-200 transition"
+            >
+              {worklistSortOrder === "top" ? "🔽 Sort: High to Low" : "🔼 Sort: Low to High"}
+            </button>
           </div>
 
           {loading ? (
@@ -392,7 +426,22 @@ export default function AdminWorkList() {
             <>
               <div className="bg-white rounded-xl border overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead><tr className="bg-slate-50 text-xs uppercase border-b"><th className="p-3 text-left">#</th><th className="p-3 text-left">Employee</th><th className="p-3 text-left">Worklist</th><th className="p-3 text-left">Frequency</th><th className="p-3 text-left">Schedule</th><th className="p-3 text-left">Time</th><th className="p-3 text-left">AI Time</th><th className="p-3 text-left">Link/Remark</th><th className="p-3 text-center">Actions</th></tr></thead>
+                  <thead><tr className="bg-slate-50 text-xs uppercase border-b">
+                    <th className="p-3 text-left">#</th>
+                    <th className="p-3 text-left">Employee</th>
+                    <th className="p-3 text-left">Worklist</th>
+                    <th className="p-3 text-left">Frequency</th>
+                    <th className="p-3 text-left">Schedule</th>
+                    <th className="p-3 text-left">
+                      Time
+                      <span className="ml-1 text-xs text-slate-400">
+                        ({worklistSortOrder === "top" ? "⬇️" : "⬆️"})
+                      </span>
+                    </th>
+                    <th className="p-3 text-left">AI Time</th>
+                    <th className="p-3 text-left">Link/Remark</th>
+                    <th className="p-3 text-center">Actions</th>
+                  </tr></thead>
                   <tbody>
                     {paginatedData.map((wl,idx)=>(
                       <tr key={wl.WorkListId} className="border-t hover:bg-slate-50">
@@ -401,7 +450,16 @@ export default function AdminWorkList() {
                         <td className="p-3">{wl.WorklistName}</td>
                         <td className="p-3"><span className={`px-2 py-1 rounded-full text-xs font-bold ${wl.Frequency==="Daily"?"bg-blue-100 text-blue-700":wl.Frequency==="Weekly"?"bg-amber-100 text-amber-700":wl.Frequency==="Monthly"?"bg-purple-100 text-purple-700":"bg-orange-100 text-orange-700"}`}>{wl.Frequency}</span></td>
                         <td className="p-3 text-xs">{wl.ScheduleDays||wl.ScheduleDates||"Every day"}</td>
-                        <td className="p-3">{wl.WorkingTime}</td>
+                        <td className="p-3 font-medium">
+                          {wl.WorkingTime}
+                          {/* Show indicator if this is the highest or lowest */}
+                          {paginatedData.length > 1 && (
+                            <span className="ml-1 text-xs">
+                              {parseInt(wl.WorkingTime) === Math.max(...paginatedData.map(w => parseInt(w.WorkingTime) || 0)) && "🔴"}
+                              {parseInt(wl.WorkingTime) === Math.min(...paginatedData.filter(w => w.WorkingTime).map(w => parseInt(w.WorkingTime) || 0)) && "🟢"}
+                            </span>
+                          )}
+                        </td>
                         <td className="p-3">{wl.AITime?<span className="text-emerald-600 font-bold">🤖 {wl.AITime}</span>:<span className="text-gray-400">-</span>}</td>
                         <td className="p-3 max-w-[200px] text-xs break-all">{wl.TemplateLink?<a href={wl.TemplateLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">📎 Link</a>:(wl.Remark||"-")}</td>
                         <td className="p-3 text-center"><button onClick={()=>openAITimeSheet(wl)} className="bg-emerald-600 text-white px-3 py-1 rounded text-xs hover:bg-emerald-700 font-bold">🤖 AI Time Sheet</button></td>
