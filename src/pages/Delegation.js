@@ -38,7 +38,11 @@ export default function Delegation() {
     Notes: "",
   });
 
-  // ✅ NEW: State for go to top button visibility
+  // ✅ NEW: Sort states
+  const [sortBy, setSortBy] = useState(""); // "" = default, "deadline", "createdDate"
+  const [sortOrder, setSortOrder] = useState("asc"); // "asc" or "desc"
+
+  // ✅ NEW: Go to top button visibility
   const [showGoToTop, setShowGoToTop] = useState(false);
   const topRef = useRef(null);
 
@@ -147,6 +151,35 @@ export default function Delegation() {
     
     return diffDays > 21; // 3 weeks = 21 days
   }
+
+  // ✅ NEW: Sort functions
+  const sortTasks = (tasksToSort) => {
+    if (!sortBy) return tasksToSort;
+
+    const sorted = [...tasksToSort];
+    
+    sorted.sort((a, b) => {
+      let dateA, dateB;
+      
+      if (sortBy === "deadline") {
+        dateA = parseDDMMYYYY(a.Deadline);
+        dateB = parseDDMMYYYY(b.Deadline);
+      } else if (sortBy === "createdDate") {
+        dateA = parseDDMMYYYY(a.CreatedDate);
+        dateB = parseDDMMYYYY(b.CreatedDate);
+      }
+
+      // Handle null/undefined dates
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+
+      const comparison = dateA.getTime() - dateB.getTime();
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+
+    return sorted;
+  };
 
   // ----------------------- Download Report
   const downloadDelegationReport = () => {
@@ -595,6 +628,14 @@ Thanks`
     return `${dd}/${mm}/${yyyy}`;
   };
 
+  // ✅ NEW: Go to top function
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  };
+
   // -----------------------
   const loadEmployees = async () => {
     try {
@@ -890,7 +931,7 @@ Thanks`
   // ✅ MAIN FILTER - UPDATED with threeWeekAbove tab
   const today = getTodayStart();
 
-  const filteredTasks = sortedTasks.filter((t) => {
+  let filteredTasks = sortedTasks.filter((t) => {
     if (activeTab === "pending") {
       return (
         t.Status !== "Completed" &&
@@ -942,17 +983,24 @@ Thanks`
     return false;
   });
 
-  // ✅ NEW: Go to top function
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth"
-    });
+  // ✅ NEW: Apply sorting to filtered tasks
+  filteredTasks = sortTasks(filteredTasks);
+
+  // ✅ NEW: Toggle sort function
+  const toggleSort = (type) => {
+    if (sortBy === type) {
+      // Toggle order
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      // Set new sort
+      setSortBy(type);
+      setSortOrder("asc");
+    }
   };
 
   return (
     <div className="p-4 max-w-4xl mx-auto" ref={topRef}>
-      {/* ✅ NEW: Go to Top Button */}
+      {/* ✅ NEW: Floating Go to Top Button */}
       {selectedEmp && showGoToTop && (
         <button
           onClick={scrollToTop}
@@ -963,18 +1011,8 @@ Thanks`
           }}
           title="Go to Top"
         >
-          <svg 
-            className="w-6 h-6" 
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth={2} 
-              d="M5 10l7-7m0 0l7 7m-7-7v18" 
-            />
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
           </svg>
         </button>
       )}
@@ -1097,8 +1135,8 @@ Thanks`
             Pending Delegation Whatsapp Flowup
           </button>
 
-          {/* ✅ NEW: Quick Scroll to Top Button */}
-          <button
+          {/* ✅ NEW: Go to Top button */}
+          {/* <button
             onClick={scrollToTop}
             className="bg-indigo-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-indigo-700 transition"
           >
@@ -1106,7 +1144,7 @@ Thanks`
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
             </svg>
             Go to Top
-          </button>
+          </button> */}
         </div>
       )}
 
@@ -1200,79 +1238,129 @@ Thanks`
             </button>
           </div>
 
+          {/* ✅ NEW: Sort Buttons */}
+          <div className="flex gap-3 mb-4 flex-wrap items-center">
+            <span className="text-sm font-medium text-gray-700 mr-2">Sort by:</span>
+            
+            <button
+              onClick={() => toggleSort("deadline")}
+              className={`px-3 py-1.5 rounded text-sm flex items-center gap-1 transition ${
+                sortBy === "deadline" 
+                  ? "bg-blue-600 text-white" 
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              📅 Deadline
+              {sortBy === "deadline" && (
+                <span className="ml-1">
+                  {sortOrder === "asc" ? "↑" : "↓"}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => toggleSort("createdDate")}
+              className={`px-3 py-1.5 rounded text-sm flex items-center gap-1 transition ${
+                sortBy === "createdDate" 
+                  ? "bg-green-600 text-white" 
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              📝 Created Date
+              {sortBy === "createdDate" && (
+                <span className="ml-1">
+                  {sortOrder === "asc" ? "↑" : "↓"}
+                </span>
+              )}
+            </button>
+
+            {sortBy && (
+              <button
+                onClick={() => {
+                  setSortBy("");
+                  setSortOrder("asc");
+                }}
+                className="px-3 py-1.5 rounded text-sm bg-red-500 text-white hover:bg-red-600 transition"
+              >
+                ✕ Clear Sort
+              </button>
+            )}
+          </div>
+
           {/* Task List */}
           <div className="grid gap-4 max-h-[500px] overflow-y-auto">
-            {filteredTasks.map((task) => (
-              <div 
-                key={task.TaskID} 
-                className={`p-4 bg-white rounded shadow border ${
-                  activeTab === "threeWeekAbove" ? "border-red-500 border-2" : ""
-                }`}
-              >
-                <div className="flex justify-between">
-                  <div>
-                    <div className="font-semibold text-lg">{task.TaskName}</div>
-                    <div className="text-sm text-gray-600">
-                      Created: {task.CreatedDate || "—"}, <span/><span/>
-                      Deadline: {task.Deadline || "—"}, <span />
-                      Completed: {task.FinalDate || "—"}, <span />
-                      Revision: {task.Revisions || "0"},<span/><span/>
-                      Name: {task.Name || "_"}
-                    </div>
-                    {activeTab === "threeWeekAbove" && (
-                      <div className="text-sm text-red-600 font-semibold mt-1">
-                        ⚠️ Overdue by 3+ weeks
-                      </div>
-                    )}
-                  </div>
-                  <span
-                    className={`px-2 py-1 rounded text-sm ${
-                      task.Status === "Completed"
-                        ? "bg-green-100 text-green-700"
-                        : task.Status === "Shifted"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-blue-100 text-blue-700"
-                    }`}
-                  >
-                    {task.Status}
-                  </span>
-                </div>
-
-                <div className="mt-3 flex gap-3">
-                  <button
-                    onClick={() => editTaskDetails(task)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded"
-                  >
-                    Edit
-                  </button>
-                </div>
-
-                {activeTab === "completed" && task.Status === "Completed" && (
-                  <div className="mt-3">
-                    <label className="text-sm font-medium mr-2">Approval:</label>
-                    <select
-                      className="border p-1 rounded"
-                      value={task.Taskcompletedapproval==="Pending"?"":task.Taskcompletedapproval || ""}
-                      onChange={(e) =>
-                        handleApprovalChange(task.TaskID, e.target.value)
-                      }
-                      disabled={loadingApprovalId === task.TaskID}
-                    >
-                      <option value="">Select</option>
-                      <option value="Approved">Approved</option>
-                      <option value="Pending">Pending</option>
-                    </select>
-                    {loadingApprovalId === task.TaskID ? "Processing..." : ""}
-                  </div>
-                )}
-              </div>
-            ))}
-            
-            {/* Show message when no tasks in 3 Week Above tab */}
-            {activeTab === "threeWeekAbove" && filteredTasks.length === 0 && (
+            {filteredTasks.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
-                No tasks that are 3 weeks overdue 🎉
+                {activeTab === "threeWeekAbove" 
+                  ? "No tasks that are 3 weeks overdue 🎉" 
+                  : "No tasks found"}
               </div>
+            ) : (
+              filteredTasks.map((task) => (
+                <div 
+                  key={task.TaskID} 
+                  className={`p-4 bg-white rounded shadow border ${
+                    activeTab === "threeWeekAbove" ? "border-red-500 border-2" : ""
+                  }`}
+                >
+                  <div className="flex justify-between">
+                    <div>
+                      <div className="font-semibold text-lg">{task.TaskName}</div>
+                      <div className="text-sm text-gray-600">
+                        Created: {task.CreatedDate || "—"}, <span/><span/>
+                        Deadline: {task.Deadline || "—"}, <span />
+                        Completed: {task.FinalDate || "—"}, <span />
+                        Revision: {task.Revisions || "0"},<span/><span/>
+                        Name: {task.Name || "_"}
+                      </div>
+                      {activeTab === "threeWeekAbove" && (
+                        <div className="text-sm text-red-600 font-semibold mt-1">
+                          ⚠️ Overdue by 3+ weeks
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      className={`px-2 py-1 rounded text-sm ${
+                        task.Status === "Completed"
+                          ? "bg-green-100 text-green-700"
+                          : task.Status === "Shifted"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      {task.Status}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex gap-3">
+                    <button
+                      onClick={() => editTaskDetails(task)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded"
+                    >
+                      Edit
+                    </button>
+                  </div>
+
+                  {activeTab === "completed" && task.Status === "Completed" && (
+                    <div className="mt-3">
+                      <label className="text-sm font-medium mr-2">Approval:</label>
+                      <select
+                        className="border p-1 rounded"
+                        value={task.Taskcompletedapproval==="Pending"?"":task.Taskcompletedapproval || ""}
+                        onChange={(e) =>
+                          handleApprovalChange(task.TaskID, e.target.value)
+                        }
+                        disabled={loadingApprovalId === task.TaskID}
+                      >
+                        <option value="">Select</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Pending">Pending</option>
+                      </select>
+                      {loadingApprovalId === task.TaskID ? "Processing..." : ""}
+                    </div>
+                  )}
+                </div>
+              ))
             )}
           </div>
         </>
