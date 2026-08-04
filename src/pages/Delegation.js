@@ -17,15 +17,15 @@ export default function Delegation() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const [activeTab, setActiveTab] = useState("pending"); // pending / completed / approved / threeWeekAbove
+  const [activeTab, setActiveTab] = useState("pending");
   const [shiftTask, setShiftTask] = useState(null);
   const [shiftDate, setShiftDate] = useState("");
   const [loadingShiftBtn, setLoadingShiftBtn] = useState(false);
   const [loadingTaskId, setLoadingTaskId] = useState(null);
   const [loadingApprovalId, setLoadingApprovalId] = useState(null);
 
-  const [editTask, setEditTask] = useState(null);  // For editing task
-  const [deleteTaskId, setDeleteTaskId] = useState(null); // For delete task confirmation
+  const [editTask, setEditTask] = useState(null);
+  const [deleteTaskId, setDeleteTaskId] = useState(null);
   const whatsappRef = useRef(null);
 
   const [showCreate, setShowCreate] = useState(false);
@@ -38,13 +38,12 @@ export default function Delegation() {
     Notes: "",
   });
 
-  // ✅ NEW: Sort states
-  const [sortBy, setSortBy] = useState(""); // "" = default, "deadline", "createdDate"
-  const [sortOrder, setSortOrder] = useState("asc"); // "asc" or "desc"
+  // ✅ Sort states
+  const [sortBy, setSortBy] = useState("createdDate"); // Default: createdDate
+  const [sortOrder, setSortOrder] = useState("asc"); // Default: ascending (oldest first)
 
-  // ✅ NEW: Go to top button visibility
+  // ✅ Go to top button visibility
   const [showGoToTop, setShowGoToTop] = useState(false);
-  const topRef = useRef(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -59,7 +58,7 @@ export default function Delegation() {
     };
   }, []);
 
-  // ✅ NEW: Scroll listener for go to top button
+  // ✅ Scroll listener for go to top button
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 300) {
@@ -89,7 +88,6 @@ export default function Delegation() {
     return `${dd}/${mm}/${yyyy} ${hh}:${min}:${ss}`;
   }
 
-  // ✅ Convert "dd/mm/yyyy" or "dd/mm/yyyy hh:mm:ss" → Date object
   function parseDDMMYYYY(dateStr) {
     if (!dateStr) return null;
 
@@ -112,13 +110,11 @@ export default function Delegation() {
     }
   }
 
-  // ✅ Get today's date WITHOUT time (for accurate date comparison)
   function getTodayStart() {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   }
 
-  // ✅ Check if a date is today or in the past (compares year, month, day)
   function isTodayOrPast(deadlineDateStr) {
     const deadlineDate = parseDDMMYYYY(deadlineDateStr);
     if (!deadlineDate) return false;
@@ -133,7 +129,6 @@ export default function Delegation() {
     return deadlineOnlyDate <= today;
   }
 
-  // ✅ UPDATED: Check if a task is 3 weeks old based on CREATED DATE
   function isThreeWeekAboveByCreatedDate(createdDateStr) {
     const createdDate = parseDDMMYYYY(createdDateStr);
     if (!createdDate) return false;
@@ -145,16 +140,15 @@ export default function Delegation() {
       createdDate.getDate()
     );
     
-    // Calculate difference in days
     const diffTime = today.getTime() - createdOnlyDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    return diffDays > 21; // 3 weeks = 21 days
+    return diffDays > 21;
   }
 
-  // ✅ NEW: Sort functions
+  // ✅ Sort functions - Default: Created Date Oldest First
   const sortTasks = (tasksToSort) => {
-    if (!sortBy) return tasksToSort;
+    if (!tasksToSort || tasksToSort.length === 0) return tasksToSort;
 
     const sorted = [...tasksToSort];
     
@@ -169,7 +163,6 @@ export default function Delegation() {
         dateB = parseDDMMYYYY(b.CreatedDate);
       }
 
-      // Handle null/undefined dates
       if (!dateA && !dateB) return 0;
       if (!dateA) return 1;
       if (!dateB) return -1;
@@ -181,7 +174,7 @@ export default function Delegation() {
     return sorted;
   };
 
-  // ----------------------- Download Report
+  // ----------------------- Download Report Functions
   const downloadDelegationReport = () => {
     if (!selectedEmp) {
       toast.warn("Select employee first");
@@ -197,13 +190,16 @@ export default function Delegation() {
       return;
     }
 
+    // ✅ Sort by Created Date - Oldest first
     filtered.sort((a, b) => {
-      // 1️⃣ First sort by Name
-      const nameCompare = (a.Name || "").localeCompare(b.Name || "");
-      if (nameCompare !== 0) return nameCompare;
-
-      // 2️⃣ Then sort by Status for same Name
-      return (a.Status || "").localeCompare(b.Status || "");
+      const dateA = parseDDMMYYYY(a.CreatedDate);
+      const dateB = parseDDMMYYYY(b.CreatedDate);
+      
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      
+      return dateA.getTime() - dateB.getTime();
     });
 
     const doc = new jsPDF({
@@ -242,7 +238,7 @@ export default function Delegation() {
         overflow: "linebreak",
       },
       columnStyles: {
-        1: { cellWidth: 60 }, // Task Name column
+        1: { cellWidth: 60 },
         0: { cellWidth: 20 }
       },
     });
@@ -272,13 +268,16 @@ export default function Delegation() {
       return;
     }
 
+    // ✅ Sort by Created Date - Oldest first
     filtered.sort((a, b) => {
-      // 1️⃣ First sort by Name
-      const nameCompare = (a.Name || "").localeCompare(b.Name || "");
-      if (nameCompare !== 0) return nameCompare;
-
-      // 2️⃣ Then sort by Status for same Name
-      return (a.Status || "").localeCompare(b.Status || "");
+      const dateA = parseDDMMYYYY(a.CreatedDate);
+      const dateB = parseDDMMYYYY(b.CreatedDate);
+      
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      
+      return dateA.getTime() - dateB.getTime();
     });
 
     const doc = new jsPDF({
@@ -317,7 +316,7 @@ export default function Delegation() {
         overflow: "linebreak",
       },
       columnStyles: {
-        1: { cellWidth: 60 }, // Task Name column
+        1: { cellWidth: 60 },
         0: { cellWidth: 20 }
       },
     });
@@ -347,13 +346,16 @@ export default function Delegation() {
       return;
     }
 
+    // ✅ Sort by Created Date - Oldest first
     filtered.sort((a, b) => {
-      // 1️⃣ First sort by Name
-      const nameCompare = (a.Name || "").localeCompare(b.Name || "");
-      if (nameCompare !== 0) return nameCompare;
-
-      // 2️⃣ Then sort by Status for same Name
-      return (a.Status || "").localeCompare(b.Status || "");
+      const dateA = parseDDMMYYYY(a.CreatedDate);
+      const dateB = parseDDMMYYYY(b.CreatedDate);
+      
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      
+      return dateA.getTime() - dateB.getTime();
     });
 
     const doc = new jsPDF({
@@ -392,7 +394,7 @@ export default function Delegation() {
         overflow: "linebreak",
       },
       columnStyles: {
-        1: { cellWidth: 60 }, // Task Name column
+        1: { cellWidth: 60 },
         0: { cellWidth: 20 }
       },
     });
@@ -407,7 +409,7 @@ export default function Delegation() {
     setShowDownloadDropdown(false);
   };
 
-  // ✅ UPDATED: Download 3 Week Above Report (based on Created Date)
+  // ✅ UPDATED: Download 3 Week Above Report - Sorted by Created Date (Oldest First)
   const downloadDelegationReportThreeWeekAbove = () => {
     if (!selectedEmp) {
       toast.warn("Select employee first");
@@ -425,10 +427,16 @@ export default function Delegation() {
       return;
     }
 
+    // ✅ Sort by Created Date - Oldest first (ascending)
     filtered.sort((a, b) => {
-      const nameCompare = (a.Name || "").localeCompare(b.Name || "");
-      if (nameCompare !== 0) return nameCompare;
-      return (a.Status || "").localeCompare(b.Status || "");
+      const dateA = parseDDMMYYYY(a.CreatedDate);
+      const dateB = parseDDMMYYYY(b.CreatedDate);
+      
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      
+      return dateA.getTime() - dateB.getTime();
     });
 
     const doc = new jsPDF({
@@ -628,7 +636,7 @@ Thanks`
     return `${dd}/${mm}/${yyyy}`;
   };
 
-  // ✅ NEW: Go to top function
+  // ✅ Go to top function
   const scrollToTop = () => {
     window.scrollTo({
       top: 0,
@@ -762,7 +770,6 @@ Thanks`
     }
   };
 
-  // -----------------------
   const handleDone = async (taskID) => {
     setLoadingTaskId(taskID);
     try {
@@ -928,7 +935,6 @@ Thanks`
     return nameA.localeCompare(nameB);
   });
 
-  // ✅ MAIN FILTER - UPDATED with threeWeekAbove tab (based on Created Date)
   const today = getTodayStart();
 
   let filteredTasks = sortedTasks.filter((t) => {
@@ -969,7 +975,6 @@ Thanks`
         t.Status !== "Completed"
       );
     }
-    // ✅ UPDATED: Three Week Above Tab based on CREATED DATE
     else if (activeTab === "threeWeekAbove") {
       return (
         isThreeWeekAboveByCreatedDate(t.CreatedDate) &&
@@ -983,43 +988,50 @@ Thanks`
     return false;
   });
 
-  // ✅ NEW: Apply sorting to filtered tasks
+  // ✅ Apply sorting to filtered tasks
   filteredTasks = sortTasks(filteredTasks);
 
-  // ✅ NEW: Toggle sort function
+  // ✅ Toggle sort function
   const toggleSort = (type) => {
     if (sortBy === type) {
-      // Toggle order
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
-      // Set new sort
       setSortBy(type);
       setSortOrder("asc");
     }
   };
 
   return (
-    <div className="p-4 max-w-4xl mx-auto" ref={topRef}>
-      {/* ✅ NEW: Floating Go to Top Button */}
+    <div className="p-4 max-w-4xl mx-auto">
+      {/* ✅ Floating Go to Top Button */}
       {selectedEmp && showGoToTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-8 right-8 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 z-50 flex items-center justify-center"
+          className="fixed bottom-8 right-8 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 hover:shadow-xl transition-all duration-300 z-50 flex items-center justify-center group"
           style={{
-            width: "56px",
-            height: "56px",
+            width: "60px",
+            height: "60px",
           }}
           title="Go to Top"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          <svg 
+            className="w-7 h-7 group-hover:scale-110 transition-transform" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2.5} 
+              d="M5 10l7-7m0 0l7 7m-7-7v18" 
+            />
           </svg>
         </button>
       )}
 
       {/* Employee Select */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        {/* Select Employee */}
         <div>
           <label className="block mb-1 text-sm font-medium text-gray-700">
             Select Employee
@@ -1045,7 +1057,6 @@ Thanks`
           </select>
         </div>
 
-        {/* Assign By */}
         <div>
           <label className="block mb-1 text-sm font-medium text-gray-700">
             Assign By
@@ -1101,7 +1112,7 @@ Thanks`
             </button>
             
             {showDownloadDropdown && (
-              <div className="absolute left-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 border">
+              <div className="absolute left-0 mt-2 w-72 bg-white rounded-md shadow-lg z-10 border">
                 <button
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   onClick={downloadDelegationReport}
@@ -1120,12 +1131,12 @@ Thanks`
                 >
                   ✅ Only Completed Tasks
                 </button>
-                {/* ✅ UPDATED: 3 Week Above Download button (by Created Date) */}
+                {/* ✅ 3 Week Above Download - Sorted by Created Date Oldest First */}
                 <button
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t"
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t font-medium"
                   onClick={downloadDelegationReportThreeWeekAbove}
                 >
-                  📅 3 Week Above Tasks (by Created Date)
+                  📅 3 Week Above Tasks (Oldest First)
                 </button>
               </div>
             )}
@@ -1183,7 +1194,7 @@ Thanks`
 
       {!loading && selectedEmp && (
         <>
-          {/* Tabs - Updated with 3 Week Above */}
+          {/* Tabs */}
           <div className="flex gap-3 mb-6 flex-wrap">
             <button
               className={`px-3 py-2 rounded ${
@@ -1207,7 +1218,7 @@ Thanks`
               }`}
               onClick={() => setActiveTab("threeWeekAbove")}
             >
-              ⚠️ 3 Week Above (Created)
+              ⚠️ 3 Week Above
             </button>
             <button
               className={`px-3 py-2 rounded ${
@@ -1227,7 +1238,7 @@ Thanks`
             </button>
           </div>
 
-          {/* ✅ NEW: Sort Buttons */}
+          {/* Sort Buttons */}
           <div className="flex gap-3 mb-4 flex-wrap items-center">
             <span className="text-sm font-medium text-gray-700 mr-2">Sort by:</span>
             
@@ -1258,7 +1269,7 @@ Thanks`
               📝 Created Date
               {sortBy === "createdDate" && (
                 <span className="ml-1">
-                  {sortOrder === "asc" ? "↑" : "↓"}
+                  {sortOrder === "asc" ? "↑ (Oldest)" : "↓ (Newest)"}
                 </span>
               )}
             </button>
@@ -1266,12 +1277,12 @@ Thanks`
             {sortBy && (
               <button
                 onClick={() => {
-                  setSortBy("");
+                  setSortBy("createdDate");
                   setSortOrder("asc");
                 }}
                 className="px-3 py-1.5 rounded text-sm bg-red-500 text-white hover:bg-red-600 transition"
               >
-                ✕ Clear Sort
+                ✕ Reset
               </button>
             )}
           </div>
@@ -1281,7 +1292,7 @@ Thanks`
             {filteredTasks.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
                 {activeTab === "threeWeekAbove" 
-                  ? "No tasks that are 3 weeks old (by Created Date) 🎉" 
+                  ? "No tasks that are 3 weeks old 🎉" 
                   : "No tasks found"}
               </div>
             ) : (
