@@ -133,20 +133,20 @@ export default function Delegation() {
     return deadlineOnlyDate <= today;
   }
 
-  // ✅ Check if a date is 3 weeks (21 days) old
-  function isThreeWeekAbove(deadlineDateStr) {
-    const deadlineDate = parseDDMMYYYY(deadlineDateStr);
-    if (!deadlineDate) return false;
+  // ✅ UPDATED: Check if a task is 3 weeks old based on CREATED DATE
+  function isThreeWeekAboveByCreatedDate(createdDateStr) {
+    const createdDate = parseDDMMYYYY(createdDateStr);
+    if (!createdDate) return false;
     
     const today = getTodayStart();
-    const deadlineOnlyDate = new Date(
-      deadlineDate.getFullYear(),
-      deadlineDate.getMonth(),
-      deadlineDate.getDate()
+    const createdOnlyDate = new Date(
+      createdDate.getFullYear(),
+      createdDate.getMonth(),
+      createdDate.getDate()
     );
     
     // Calculate difference in days
-    const diffTime = today.getTime() - deadlineOnlyDate.getTime();
+    const diffTime = today.getTime() - createdOnlyDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     return diffDays > 21; // 3 weeks = 21 days
@@ -407,7 +407,7 @@ export default function Delegation() {
     setShowDownloadDropdown(false);
   };
 
-  // ✅ NEW: Download 3 Week Above Report
+  // ✅ UPDATED: Download 3 Week Above Report (based on Created Date)
   const downloadDelegationReportThreeWeekAbove = () => {
     if (!selectedEmp) {
       toast.warn("Select employee first");
@@ -415,7 +415,7 @@ export default function Delegation() {
     }
 
     const filtered = tasks.filter(
-      t => isThreeWeekAbove(t.Deadline) && 
+      t => isThreeWeekAboveByCreatedDate(t.CreatedDate) && 
            t.Status !== "Completed" && 
            t.Taskcompletedapproval !== "Approved"
     );
@@ -438,7 +438,7 @@ export default function Delegation() {
     });
 
     doc.setFontSize(14);
-    doc.text(`3 Week Above Tasks Report - ${selectedEmp}`, 14, 15);
+    doc.text(`3 Week Above Tasks Report (by Created Date) - ${selectedEmp}`, 14, 15);
 
     autoTable(doc, {
       head: [[
@@ -928,7 +928,7 @@ Thanks`
     return nameA.localeCompare(nameB);
   });
 
-  // ✅ MAIN FILTER - UPDATED with threeWeekAbove tab
+  // ✅ MAIN FILTER - UPDATED with threeWeekAbove tab (based on Created Date)
   const today = getTodayStart();
 
   let filteredTasks = sortedTasks.filter((t) => {
@@ -969,10 +969,10 @@ Thanks`
         t.Status !== "Completed"
       );
     }
-    // ✅ NEW: Three Week Above Tab
+    // ✅ UPDATED: Three Week Above Tab based on CREATED DATE
     else if (activeTab === "threeWeekAbove") {
       return (
-        isThreeWeekAbove(t.Deadline) &&
+        isThreeWeekAboveByCreatedDate(t.CreatedDate) &&
         t.Status !== "Completed" &&
         (!t.Taskcompletedapproval ||
           t.Taskcompletedapproval === "Pending" ||
@@ -1120,12 +1120,12 @@ Thanks`
                 >
                   ✅ Only Completed Tasks
                 </button>
-                {/* ✅ NEW: 3 Week Above Download button */}
+                {/* ✅ UPDATED: 3 Week Above Download button (by Created Date) */}
                 <button
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t"
                   onClick={downloadDelegationReportThreeWeekAbove}
                 >
-                  📅 3 Week Above Tasks
+                  📅 3 Week Above Tasks (by Created Date)
                 </button>
               </div>
             )}
@@ -1134,17 +1134,6 @@ Thanks`
           <button className="bg-gray-700 text-white px-4 py-2 rounded" onClick={delegationFlowup}>
             Pending Delegation Whatsapp Flowup
           </button>
-
-          {/* ✅ NEW: Go to Top button */}
-          {/* <button
-            onClick={scrollToTop}
-            className="bg-indigo-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-indigo-700 transition"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-            </svg>
-            Go to Top
-          </button> */}
         </div>
       )}
 
@@ -1218,7 +1207,7 @@ Thanks`
               }`}
               onClick={() => setActiveTab("threeWeekAbove")}
             >
-              ⚠️ 3 Week Above
+              ⚠️ 3 Week Above (Created)
             </button>
             <button
               className={`px-3 py-2 rounded ${
@@ -1292,7 +1281,7 @@ Thanks`
             {filteredTasks.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
                 {activeTab === "threeWeekAbove" 
-                  ? "No tasks that are 3 weeks overdue 🎉" 
+                  ? "No tasks that are 3 weeks old (by Created Date) 🎉" 
                   : "No tasks found"}
               </div>
             ) : (
@@ -1315,7 +1304,7 @@ Thanks`
                       </div>
                       {activeTab === "threeWeekAbove" && (
                         <div className="text-sm text-red-600 font-semibold mt-1">
-                          ⚠️ Overdue by 3+ weeks
+                          ⚠️ Created 3+ weeks ago
                         </div>
                       )}
                     </div>
