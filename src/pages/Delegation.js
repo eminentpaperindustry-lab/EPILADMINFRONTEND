@@ -146,47 +146,13 @@ export default function Delegation() {
     return diffDays > 21;
   }
 
-  // ✅ Common sort function for reports - Name first, then Created Date (Oldest first)
-  const sortTasksForReport = (tasks) => {
-    if (!tasks || tasks.length === 0) return tasks;
-    
-    return [...tasks].sort((a, b) => {
-      // 1️⃣ Pehle Name ke hisaab se (A-Z)
-      const nameA = (a.Name || "").toLowerCase();
-      const nameB = (b.Name || "").toLowerCase();
-      
-      if (nameA !== nameB) {
-        return nameA.localeCompare(nameB);
-      }
-      
-      // 2️⃣ Agar Name same hai, toh Created Date ke hisaab se (Oldest first)
-      const dateA = parseDDMMYYYY(a.CreatedDate);
-      const dateB = parseDDMMYYYY(b.CreatedDate);
-      
-      if (!dateA && !dateB) return 0;
-      if (!dateA) return 1;
-      if (!dateB) return -1;
-      
-      return dateA.getTime() - dateB.getTime();
-    });
-  };
-
-  // ✅ Sort functions for UI - Multi-level: Name first, then Date
+  // ✅ Sort functions
   const sortTasks = (tasksToSort) => {
     if (!tasksToSort || tasksToSort.length === 0) return tasksToSort;
 
     const sorted = [...tasksToSort];
     
     sorted.sort((a, b) => {
-      // 1️⃣ Pehle Name ke hisaab se sort (A-Z)
-      const nameA = (a.Name || "").toLowerCase();
-      const nameB = (b.Name || "").toLowerCase();
-      
-      if (nameA !== nameB) {
-        return nameA.localeCompare(nameB);
-      }
-      
-      // 2️⃣ Agar name same hai, toh date ke hisaab se sort
       let dateA, dateB;
       
       if (sortBy === "deadline") {
@@ -208,6 +174,34 @@ export default function Delegation() {
     return sorted;
   };
 
+  // ✅ Helper function to sort tasks for download - By Employee Name then Created Date
+  const sortTasksForDownload = (tasksToSort) => {
+    if (!tasksToSort || tasksToSort.length === 0) return tasksToSort;
+
+    const sorted = [...tasksToSort];
+    
+    sorted.sort((a, b) => {
+      // 1️⃣ First sort by Employee Name (A to Z)
+      const nameA = (a.Name || "").toLowerCase();
+      const nameB = (b.Name || "").toLowerCase();
+      
+      if (nameA < nameB) return -1;
+      if (nameA > nameB) return 1;
+      
+      // 2️⃣ If same employee, sort by Created Date (Oldest first)
+      const dateA = parseDDMMYYYY(a.CreatedDate);
+      const dateB = parseDDMMYYYY(b.CreatedDate);
+      
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      
+      return dateA.getTime() - dateB.getTime();
+    });
+
+    return sorted;
+  };
+
   // ----------------------- Download Report Functions
   const downloadDelegationReport = () => {
     if (!selectedEmp) {
@@ -224,8 +218,8 @@ export default function Delegation() {
       return;
     }
 
-    // ✅ Sort by Name first, then Created Date
-    const sortedFiltered = sortTasksForReport(filtered);
+    // ✅ Sort by Employee Name (A to Z) then Created Date (Oldest first)
+    const sortedData = sortTasksForDownload(filtered);
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -246,7 +240,7 @@ export default function Delegation() {
         "Revisions",
         "Status"
       ]],
-      body: sortedFiltered.map(t => [
+      body: sortedData.map(t => [
         t.Name || "",
         t.TaskName || "",
         t.CreatedDate || "--",
@@ -293,8 +287,8 @@ export default function Delegation() {
       return;
     }
 
-    // ✅ Sort by Name first, then Created Date
-    const sortedFiltered = sortTasksForReport(filtered);
+    // ✅ Sort by Employee Name (A to Z) then Created Date (Oldest first)
+    const sortedData = sortTasksForDownload(filtered);
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -315,7 +309,7 @@ export default function Delegation() {
         "Revisions",
         "Status"
       ]],
-      body: sortedFiltered.map(t => [
+      body: sortedData.map(t => [
         t.Name || "",
         t.TaskName || "",
         t.CreatedDate || "--",
@@ -362,8 +356,8 @@ export default function Delegation() {
       return;
     }
 
-    // ✅ Sort by Name first, then Created Date
-    const sortedFiltered = sortTasksForReport(filtered);
+    // ✅ Sort by Employee Name (A to Z) then Created Date (Oldest first)
+    const sortedData = sortTasksForDownload(filtered);
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -384,7 +378,7 @@ export default function Delegation() {
         "Revisions",
         "Status"
       ]],
-      body: sortedFiltered.map(t => [
+      body: sortedData.map(t => [
         t.Name || "",
         t.TaskName || "",
         t.CreatedDate || "--",
@@ -416,6 +410,7 @@ export default function Delegation() {
     setShowDownloadDropdown(false);
   };
 
+  // ✅ UPDATED: Download 3 Week Above Report - Sorted by Employee Name then Created Date
   const downloadDelegationReportThreeWeekAbove = () => {
     if (!selectedEmp) {
       toast.warn("Select employee first");
@@ -433,8 +428,8 @@ export default function Delegation() {
       return;
     }
 
-    // ✅ Sort by Name first, then Created Date
-    const sortedFiltered = sortTasksForReport(filtered);
+    // ✅ Sort by Employee Name (A to Z) then Created Date (Oldest first)
+    const sortedData = sortTasksForDownload(filtered);
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -455,7 +450,7 @@ export default function Delegation() {
         "Revisions",
         "Status"
       ]],
-      body: sortedFiltered.map(t => [
+      body: sortedData.map(t => [
         t.Name || "",
         t.TaskName || "",
         t.CreatedDate || "--",
@@ -985,7 +980,7 @@ Thanks`
     return false;
   });
 
-  // ✅ Apply sorting to filtered tasks (Name first, then Date)
+  // ✅ Apply sorting to filtered tasks
   filteredTasks = sortTasks(filteredTasks);
 
   // ✅ Toggle sort function
