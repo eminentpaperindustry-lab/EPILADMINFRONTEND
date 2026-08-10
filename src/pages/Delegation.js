@@ -39,8 +39,8 @@ export default function Delegation() {
   });
 
   // ✅ Sort states
-  const [sortBy, setSortBy] = useState("createdDate"); // Default: createdDate
-  const [sortOrder, setSortOrder] = useState("asc"); // Default: ascending (oldest first)
+  const [sortBy, setSortBy] = useState("createdDate");
+  const [sortOrder, setSortOrder] = useState("asc");
 
   // ✅ Go to top button visibility
   const [showGoToTop, setShowGoToTop] = useState(false);
@@ -146,13 +146,47 @@ export default function Delegation() {
     return diffDays > 21;
   }
 
-  // ✅ Sort functions - Default: Created Date Oldest First
+  // ✅ Common sort function for reports - Name first, then Created Date (Oldest first)
+  const sortTasksForReport = (tasks) => {
+    if (!tasks || tasks.length === 0) return tasks;
+    
+    return [...tasks].sort((a, b) => {
+      // 1️⃣ Pehle Name ke hisaab se (A-Z)
+      const nameA = (a.Name || "").toLowerCase();
+      const nameB = (b.Name || "").toLowerCase();
+      
+      if (nameA !== nameB) {
+        return nameA.localeCompare(nameB);
+      }
+      
+      // 2️⃣ Agar Name same hai, toh Created Date ke hisaab se (Oldest first)
+      const dateA = parseDDMMYYYY(a.CreatedDate);
+      const dateB = parseDDMMYYYY(b.CreatedDate);
+      
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      
+      return dateA.getTime() - dateB.getTime();
+    });
+  };
+
+  // ✅ Sort functions for UI - Multi-level: Name first, then Date
   const sortTasks = (tasksToSort) => {
     if (!tasksToSort || tasksToSort.length === 0) return tasksToSort;
 
     const sorted = [...tasksToSort];
     
     sorted.sort((a, b) => {
+      // 1️⃣ Pehle Name ke hisaab se sort (A-Z)
+      const nameA = (a.Name || "").toLowerCase();
+      const nameB = (b.Name || "").toLowerCase();
+      
+      if (nameA !== nameB) {
+        return nameA.localeCompare(nameB);
+      }
+      
+      // 2️⃣ Agar name same hai, toh date ke hisaab se sort
       let dateA, dateB;
       
       if (sortBy === "deadline") {
@@ -190,17 +224,8 @@ export default function Delegation() {
       return;
     }
 
-    // ✅ Sort by Created Date - Oldest first
-    filtered.sort((a, b) => {
-      const dateA = parseDDMMYYYY(a.CreatedDate);
-      const dateB = parseDDMMYYYY(b.CreatedDate);
-      
-      if (!dateA && !dateB) return 0;
-      if (!dateA) return 1;
-      if (!dateB) return -1;
-      
-      return dateA.getTime() - dateB.getTime();
-    });
+    // ✅ Sort by Name first, then Created Date
+    const sortedFiltered = sortTasksForReport(filtered);
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -221,7 +246,7 @@ export default function Delegation() {
         "Revisions",
         "Status"
       ]],
-      body: filtered.map(t => [
+      body: sortedFiltered.map(t => [
         t.Name || "",
         t.TaskName || "",
         t.CreatedDate || "--",
@@ -268,17 +293,8 @@ export default function Delegation() {
       return;
     }
 
-    // ✅ Sort by Created Date - Oldest first
-    filtered.sort((a, b) => {
-      const dateA = parseDDMMYYYY(a.CreatedDate);
-      const dateB = parseDDMMYYYY(b.CreatedDate);
-      
-      if (!dateA && !dateB) return 0;
-      if (!dateA) return 1;
-      if (!dateB) return -1;
-      
-      return dateA.getTime() - dateB.getTime();
-    });
+    // ✅ Sort by Name first, then Created Date
+    const sortedFiltered = sortTasksForReport(filtered);
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -299,7 +315,7 @@ export default function Delegation() {
         "Revisions",
         "Status"
       ]],
-      body: filtered.map(t => [
+      body: sortedFiltered.map(t => [
         t.Name || "",
         t.TaskName || "",
         t.CreatedDate || "--",
@@ -346,17 +362,8 @@ export default function Delegation() {
       return;
     }
 
-    // ✅ Sort by Created Date - Oldest first
-    filtered.sort((a, b) => {
-      const dateA = parseDDMMYYYY(a.CreatedDate);
-      const dateB = parseDDMMYYYY(b.CreatedDate);
-      
-      if (!dateA && !dateB) return 0;
-      if (!dateA) return 1;
-      if (!dateB) return -1;
-      
-      return dateA.getTime() - dateB.getTime();
-    });
+    // ✅ Sort by Name first, then Created Date
+    const sortedFiltered = sortTasksForReport(filtered);
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -377,7 +384,7 @@ export default function Delegation() {
         "Revisions",
         "Status"
       ]],
-      body: filtered.map(t => [
+      body: sortedFiltered.map(t => [
         t.Name || "",
         t.TaskName || "",
         t.CreatedDate || "--",
@@ -409,7 +416,6 @@ export default function Delegation() {
     setShowDownloadDropdown(false);
   };
 
-  // ✅ UPDATED: Download 3 Week Above Report - Sorted by Created Date (Oldest First)
   const downloadDelegationReportThreeWeekAbove = () => {
     if (!selectedEmp) {
       toast.warn("Select employee first");
@@ -427,17 +433,8 @@ export default function Delegation() {
       return;
     }
 
-    // ✅ Sort by Created Date - Oldest first (ascending)
-    filtered.sort((a, b) => {
-      const dateA = parseDDMMYYYY(a.CreatedDate);
-      const dateB = parseDDMMYYYY(b.CreatedDate);
-      
-      if (!dateA && !dateB) return 0;
-      if (!dateA) return 1;
-      if (!dateB) return -1;
-      
-      return dateA.getTime() - dateB.getTime();
-    });
+    // ✅ Sort by Name first, then Created Date
+    const sortedFiltered = sortTasksForReport(filtered);
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -446,7 +443,7 @@ export default function Delegation() {
     });
 
     doc.setFontSize(14);
-    doc.text(`3 Week Above Tasks Report (by Created Date) - ${selectedEmp}`, 14, 15);
+    doc.text(`3 Week Above Tasks Report - ${selectedEmp}`, 14, 15);
 
     autoTable(doc, {
       head: [[
@@ -458,7 +455,7 @@ export default function Delegation() {
         "Revisions",
         "Status"
       ]],
-      body: filtered.map(t => [
+      body: sortedFiltered.map(t => [
         t.Name || "",
         t.TaskName || "",
         t.CreatedDate || "--",
@@ -988,7 +985,7 @@ Thanks`
     return false;
   });
 
-  // ✅ Apply sorting to filtered tasks
+  // ✅ Apply sorting to filtered tasks (Name first, then Date)
   filteredTasks = sortTasks(filteredTasks);
 
   // ✅ Toggle sort function
@@ -1131,12 +1128,11 @@ Thanks`
                 >
                   ✅ Only Completed Tasks
                 </button>
-                {/* ✅ 3 Week Above Download - Sorted by Created Date Oldest First */}
                 <button
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t font-medium"
                   onClick={downloadDelegationReportThreeWeekAbove}
                 >
-                  📅 3 Week Above Tasks (Oldest First)
+                  📅 3 Week Above Tasks
                 </button>
               </div>
             )}
