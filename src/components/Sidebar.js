@@ -151,6 +151,7 @@ export default function Sidebar({ mobile }) {
               Support Ticket
             </MenuItem>
             <MenuItem to="/worklist" icon={FaList} onClick={closeSidebar}>WorkList</MenuItem>
+            <MenuItem to="/training" icon={FaClipboardList} onClick={closeSidebar}>Training</MenuItem>
           </nav>
 
           {/* ✅ VERSION AT BOTTOM - MOBILE */}
@@ -188,6 +189,7 @@ export default function Sidebar({ mobile }) {
           Support Ticket
         </MenuItem>
         <MenuItem to="/worklist" icon={FaList} count={0}>WorkList</MenuItem>
+        <MenuItem to="/training" icon={FaClipboardList} count={0}>Training</MenuItem>
       </nav>
 
       {/* ✅ VERSION AT BOTTOM - DESKTOP */}

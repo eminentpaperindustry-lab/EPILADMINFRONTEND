@@ -97,6 +97,46 @@ export const bulkUploadWorklists = (worklists) =>
 export const downloadWorklists = (params) =>
   axios.get("/worklist/download", { ...authHeader(), params });
 
+// ──── TRAINING ────
+export const getTrainingTemplates = (params) =>
+  axios.get("/training/templates", { ...authHeader(), params });
+
+export const getTrainingDepartments = () =>
+  axios.get("/training/templates/departments", authHeader());
+
+export const createTrainingTemplate = (payload) =>
+  axios.post("/training/templates", payload, authHeader());
+
+export const approveTrainingTemplate = (templateId, approval) =>
+  axios.put(`/training/templates/approve/${templateId}`, { approval }, authHeader());
+
+export const deleteTrainingTemplate = (templateId) =>
+  axios.delete(`/training/templates/${templateId}`, authHeader());
+
+export const addTrainingIndex = (payload) =>
+  axios.post("/training/indices", payload, authHeader());
+
+export const updateTrainingIndex = (templateId, indexNo, payload) =>
+  axios.put(`/training/indices/${templateId}/${indexNo}`, payload, authHeader());
+
+export const deleteTrainingIndex = (templateId, indexNo) =>
+  axios.delete(`/training/indices/${templateId}/${indexNo}`, authHeader());
+
+export const getTrainingQuestions = (templateId) =>
+  axios.get(`/training/qa/${templateId}`, authHeader());
+
+export const addTrainingQuestion = (payload) =>
+  axios.post("/training/qa", payload, authHeader());
+
+export const updateTrainingQuestion = (qaId, payload) =>
+  axios.put(`/training/qa/${qaId}`, payload, authHeader());
+
+export const deleteTrainingQuestion = (qaId) =>
+  axios.delete(`/training/qa/${qaId}`, authHeader());
+
+export const getTrainingRecords = (params) =>
+  axios.get("/training/records", { ...authHeader(), params });
+
 // ──── OCCUPANCY ────
 export const getAdminOccupancy = (date) =>
   axios.get(`/worklist/admin/occupancy?date=${date}`, authHeader());
